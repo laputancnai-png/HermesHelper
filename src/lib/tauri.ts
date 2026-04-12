@@ -18,6 +18,7 @@ export interface HermesConfig {
   autoSkillGeneration: boolean;
   commandApproval: boolean;
   budgetWarning: boolean;
+  language: string; // "system" | "zh" | "en"
 }
 
 export interface DoctorResult {
@@ -64,6 +65,9 @@ export const Commands = {
 
   getRecentActivity: (): Promise<string[]> =>
     tauriInvoke("get_recent_activity"),
+
+  getSystemLocale: (): Promise<string> =>
+    tauriInvoke("get_system_locale"),
 };
 
 // ── Events ────────────────────────────────────────────────────
