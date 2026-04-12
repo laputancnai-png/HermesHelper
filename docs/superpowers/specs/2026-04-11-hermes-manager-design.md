@@ -124,7 +124,7 @@ hermes-manager/
 - 默认模型下拉选择
 - API Key：写入 `~/.hermes/.env`（不进 config.yaml）
 - 测试连接按钮
-- 终端沙箱：执行后端选择（local / Docker / SSH / Modal）
+- 终端沙箱：执行后端选择（MVP 仅启用 local；Docker/SSH/Modal 显示但置灰，Phase 3 解锁）
 - 行为开关：持久记忆 / 自动生成技能 / 命令审批模式 / 预算压力提示
 - 保存所有配置按钮
 
