@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useShallow } from "zustand/shallow";
 import { createHermesSlice, HermesSlice } from "./hermesSlice";
 import { createConfigSlice, ConfigSlice } from "./configSlice";
 import { createUISlice, UISlice } from "./uiSlice";
@@ -13,8 +14,8 @@ export const useStore = create<Store>()((set) => ({
   ...createUISlice(set as Parameters<typeof createUISlice>[0]),
 }));
 
-// Convenience selectors
-export const useHermesStore = () => useStore((s) => ({
+// Convenience selectors — useShallow prevents new-object-reference re-renders
+export const useHermesStore = () => useStore(useShallow((s) => ({
   isInstalled: s.isInstalled,
   version: s.version,
   doctorResults: s.doctorResults,
@@ -22,20 +23,20 @@ export const useHermesStore = () => useStore((s) => ({
   setInstalled: s.setInstalled,
   setDoctorResults: s.setDoctorResults,
   setDoctorRunning: s.setDoctorRunning,
-}));
+})));
 
-export const useConfigStore = () => useStore((s) => ({
+export const useConfigStore = () => useStore(useShallow((s) => ({
   config: s.config,
   configLoaded: s.configLoaded,
   setConfig: s.setConfig,
   updateConfig: s.updateConfig,
   setConfigLoaded: s.setConfigLoaded,
-}));
+})));
 
-export const useUIStore = () => useStore((s) => ({
+export const useUIStore = () => useStore(useShallow((s) => ({
   activePanel: s.activePanel,
   toast: s.toast,
   setActivePanel: s.setActivePanel,
   showToast: s.showToast,
   clearToast: s.clearToast,
-}));
+})));
