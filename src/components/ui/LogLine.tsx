@@ -1,32 +1,35 @@
 type LogStatus = "ok" | "warn" | "fail" | "info" | "muted";
 
-const lineClasses: Record<LogStatus, string> = {
-  ok: "text-status-green",
-  warn: "text-status-yellow",
-  fail: "text-status-red",
-  info: "text-status-blue",
-  muted: "text-text-2",
-};
-
-const prefixes: Record<LogStatus, string> = {
-  ok: "✓ ",
-  warn: "⚠ ",
-  fail: "✗ ",
-  info: "ℹ ",
+const prefixMap: Record<LogStatus, string> = {
+  ok:   "✅",
+  warn: "⚠️",
+  fail: "❌",
+  info: "→",
   muted: "",
 };
 
 interface LogLineProps {
   status: LogStatus;
-  timestamp?: string;
   message: string;
+  /** Show Apple-style row background (default true). Pass false for plain inline log text. */
+  bg?: boolean;
 }
 
-export function LogLine({ status, timestamp, message }: LogLineProps) {
+export function LogLine({ status, message, bg = true }: LogLineProps) {
+  const bgClass = bg
+    ? status === "warn"
+      ? "bg-status-yellow-bg rounded-[8px]"
+      : "bg-bg-window rounded-[8px]"
+    : "";
+  const textClass =
+    status === "info"  ? "text-accent" :
+    status === "muted" ? "text-text-tertiary" :
+    "text-text-primary";
+
   return (
-    <div className={`flex gap-3 text-[11px] font-mono leading-6 ${lineClasses[status]}`}>
-      {timestamp && <span className="text-text-2 flex-shrink-0">{timestamp}</span>}
-      <span>{prefixes[status]}{message}</span>
+    <div className={`flex items-center gap-2 px-3 py-[6px] text-[12px] font-mono ${bgClass} ${textClass}`}>
+      {prefixMap[status] && <span>{prefixMap[status]}</span>}
+      <span>{message}</span>
     </div>
   );
 }

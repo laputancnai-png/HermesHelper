@@ -8,11 +8,11 @@ interface ToggleProps {
 
 export function Toggle({ label, description, checked, onChange, disabled }: ToggleProps) {
   return (
-    <label className="flex items-center justify-between gap-3 cursor-pointer group">
+    <label className="flex items-center justify-between gap-3 cursor-pointer">
       <div>
-        <span className="text-text-0 text-[13px]">{label}</span>
+        <span className="text-text-primary text-[13px]">{label}</span>
         {description && (
-          <p className="text-text-1 text-[11px] mt-0.5">{description}</p>
+          <p className="text-text-placeholder text-[11px] mt-[2px]">{description}</p>
         )}
       </div>
       <div className="relative flex-shrink-0">
@@ -23,16 +23,16 @@ export function Toggle({ label, description, checked, onChange, disabled }: Togg
           disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
         />
+        {/* Track */}
         <div
-          className={`w-10 h-5 rounded-full transition-colors duration-[140ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${
-            checked ? "bg-cyan/20 border border-cyan/40" : "bg-bg-4 border border-white/10"
+          className={`w-[51px] h-[31px] rounded-[16px] transition-colors duration-200 ${
+            checked ? "bg-accent" : "bg-bg-secondary"
           } ${disabled ? "opacity-40" : ""}`}
         >
+          {/* Thumb */}
           <div
-            className={`absolute top-[3px] w-[14px] h-[14px] rounded-full transition-all duration-[140ms] ease-[cubic-bezier(0.4,0,0.2,1)] ${
-              checked
-                ? "left-[22px] bg-cyan shadow-[0_0_8px_rgba(0,212,255,0.5)]"
-                : "left-[3px] bg-text-1"
+            className={`absolute top-[2px] w-[27px] h-[27px] rounded-full bg-white transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,.2)] ${
+              checked ? "right-[2px]" : "left-[2px]"
             }`}
           />
         </div>

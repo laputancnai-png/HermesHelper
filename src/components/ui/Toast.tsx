@@ -12,20 +12,18 @@ export function Toast() {
 
   if (!toast) return null;
 
-  const colorClass =
-    toast.type === "success"
-      ? "border-status-green/30 text-status-green"
-      : toast.type === "error"
-      ? "border-status-red/30 text-status-red"
-      : "border-white/20 text-text-0";
+  const sidebarColor =
+    toast.type === "success" ? "bg-status-green" :
+    toast.type === "error"   ? "bg-status-red" :
+    "bg-accent";
 
   return (
-    <div className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50
-      bg-bg-2 border ${colorClass} rounded-md px-4 py-2
-      text-[12px] font-ui shadow-lg`}>
-      {toast.type === "success" && "✓ "}
-      {toast.type === "error" && "✗ "}
-      {toast.message}
+    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 animate-fade-in
+      flex items-stretch bg-white rounded-[10px] shadow-[0_4px_16px_rgba(0,0,0,.12)] overflow-hidden">
+      <div className={`w-[3px] ${sidebarColor}`} />
+      <div className="px-4 py-[10px] text-[13px] text-text-primary">
+        {toast.message}
+      </div>
     </div>
   );
 }
