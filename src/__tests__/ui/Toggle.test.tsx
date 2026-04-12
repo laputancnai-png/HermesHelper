@@ -19,4 +19,19 @@ describe("Toggle", () => {
     render(<Toggle label="Test" checked={true} onChange={() => {}} />);
     expect(screen.getByRole("checkbox")).toBeChecked();
   });
+
+  it("applies accent track color when checked (iOS style)", () => {
+    const { container } = render(
+      <Toggle label="iOS Toggle" checked={true} onChange={() => {}} />
+    );
+    // The track div should have bg-accent class when checked
+    expect(container.querySelector(".bg-accent")).toBeInTheDocument();
+  });
+
+  it("applies secondary track color when unchecked", () => {
+    const { container } = render(
+      <Toggle label="iOS Toggle" checked={false} onChange={() => {}} />
+    );
+    expect(container.querySelector(".bg-bg-secondary")).toBeInTheDocument();
+  });
 });
