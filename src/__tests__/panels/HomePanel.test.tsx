@@ -11,13 +11,14 @@ beforeEach(() => {
 describe("HomePanel", () => {
   it("renders status cards", () => {
     render(<HomePanel />);
-    expect(screen.getByText("安装状态")).toBeInTheDocument();
-    expect(screen.getByText("当前版本")).toBeInTheDocument();
+    expect(screen.getByText("home.installStatus")).toBeInTheDocument();
+    expect(screen.getByText("home.currentVersion")).toBeInTheDocument();
+    expect(screen.getByText("home.doctorResults")).toBeInTheDocument();
   });
 
   it("shows 'run doctor' button", () => {
     render(<HomePanel />);
-    expect(screen.getByText("运行诊断")).toBeInTheDocument();
+    expect(screen.getByText("home.runDiagnosis")).toBeInTheDocument();
   });
 
   it("calls run_doctor on button click", async () => {
@@ -25,7 +26,7 @@ describe("HomePanel", () => {
       { status: "ok", message: "hermes command available" },
     ]);
     render(<HomePanel />);
-    fireEvent.click(screen.getByText("运行诊断"));
+    fireEvent.click(screen.getByText("home.runDiagnosis"));
     expect(mockInvoke).toHaveBeenCalledWith("run_doctor");
   });
 });

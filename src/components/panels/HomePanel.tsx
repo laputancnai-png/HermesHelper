@@ -1,37 +1,27 @@
 import { useEffect, useState } from "react";
-import { Commands, DoctorResult } from "../../lib/tauri";
+import { useTranslation } from "react-i18next";
+import { Commands } from "../../lib/tauri";
 import { useHermesStore, useUIStore } from "../../store";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { LogLine } from "../ui/LogLine";
 
-function StatusCard({ label, value, badge }: { label: string; value: string; badge?: React.ReactNode }) {
-  return (
-    <div className="bg-bg-2 border border-white/[0.07] rounded-lg p-4">
-      <p className="text-text-2 text-[10px] font-mono uppercase tracking-widest mb-1">{label}</p>
-      <div className="flex items-center gap-2">
-        <span className="text-text-0 text-sm font-semibold">{value}</span>
-        {badge}
-      </div>
-    </div>
-  );
-}
-
 export function HomePanel() {
-  const { isInstalled, version, doctorResults, doctorRunning, setDoctorResults, setDoctorRunning, setInstalled } =
-    useHermesStore();
+  const { t } = useTranslation();
+  const {
+    isInstalled, version, doctorResults, doctorRunning,
+    setDoctorResults, setDoctorRunning, setInstalled,
+  } = useHermesStore();
   const { showToast, setActivePanel } = useUIStore();
   const [hasRunDoctor, setHasRunDoctor] = useState(false);
 
-  // Check installed status on mount
   useEffect(() => {
     let cancelled = false;
     Commands.checkHermesVersion()
       .then((v) => {
         if (!cancelled) {
-          // Guard: only accept a string version or null
-          const version = typeof v === "string" ? v : null;
-          setInstalled(!!version, version);
+          const ver = typeof v === "string" ? v : null;
+          setInstalled(!!ver, ver);
         }
       })
       .catch(() => { if (!cancelled) setInstalled(false, null); });
@@ -45,7 +35,8 @@ export function HomePanel() {
       const results = await Commands.runDoctor();
       setDoctorResults(results);
     } catch (e) {
-      showToast("诊断失败：" + String(e), "error");
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
+      showToast(`${t("toast.doctorFailed")}: ${msg}`, "error");
     } finally {
       setDoctorRunning(false);
     }
@@ -55,90 +46,100 @@ export function HomePanel() {
   const warnCount = doctorResults.filter((r) => r.status === "warn").length;
   const failCount = doctorResults.filter((r) => r.status === "fail").length;
 
+  function doctorBadge() {
+    if (!hasRunDoctor) return <Badge status="neutral">{t("home.notRun")}</Badge>;
+    if (failCount > 0) return <Badge status="red">{warnCount + failCount} {t("home.issues")}</Badge>;
+    if (warnCount > 0) return <Badge status="yellow">{warnCount} {t("home.warnings")}</Badge>;
+    return <Badge status="green">{t("home.allPassed")}</Badge>;
+  }
+
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-3 max-w-3xl">
       {/* Status cards */}
-      <div className="grid grid-cols-3 gap-4">
-        <StatusCard
-          label="安装状态"
-          value={isInstalled ? "已安装" : "未安装"}
-          badge={<Badge status={isInstalled ? "green" : "grey"}>{isInstalled ? "运行中" : "未检测到"}</Badge>}
-        />
-        <StatusCard
-          label="当前版本"
-          value={version ?? "—"}
-          badge={version ? <Badge status="blue">已检测</Badge> : undefined}
-        />
-        <StatusCard label="诊断结果" value={hasRunDoctor ? `${passCount}✓ ${warnCount}ℹ ${failCount}✗` : "未运行"} />
+      <div className="grid grid-cols-3 gap-[10px]">
+        {/* Install status card */}
+        <div className="bg-white rounded-[12px] p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)]">
+          <div className="text-[10px] text-text-tertiary font-[600] tracking-[.3px] uppercase mb-[6px]">
+            {t("home.installStatus")}
+          </div>
+          <div className="text-[18px] font-[700] text-text-primary leading-none mb-[6px]">
+            {isInstalled ? t("home.installed") : t("home.notInstalled")}
+          </div>
+          <Badge status={isInstalled ? "green" : "neutral"}>
+            {isInstalled ? t("home.running") : t("home.notDetected")}
+          </Badge>
+        </div>
+
+        {/* Version card */}
+        <div className="bg-white rounded-[12px] p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)]">
+          <div className="text-[10px] text-text-tertiary font-[600] tracking-[.3px] uppercase mb-[6px]">
+            {t("home.currentVersion")}
+          </div>
+          <div className="text-[18px] font-[700] text-text-primary leading-none mb-[6px]">
+            {version ?? "—"}
+          </div>
+          {version
+            ? <Badge status="accent">{t("home.detected")}</Badge>
+            : <Badge status="neutral">{t("home.notDetected")}</Badge>
+          }
+        </div>
+
+        {/* Doctor results card */}
+        <div className="bg-white rounded-[12px] p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)]">
+          <div className="text-[10px] text-text-tertiary font-[600] tracking-[.3px] uppercase mb-[6px]">
+            {t("home.doctorResults")}
+          </div>
+          <div className="text-[18px] font-[700] text-text-primary leading-none mb-[6px]">
+            {hasRunDoctor ? `${passCount}✓ ${warnCount}⚠` : "—"}
+          </div>
+          {doctorBadge()}
+        </div>
       </div>
 
-      {/* Doctor section */}
-      <div className="bg-bg-2 border border-white/[0.07] rounded-lg p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[11px] font-mono uppercase tracking-widest text-text-2">系统诊断</h3>
-          <Button size="sm" onClick={handleRunDoctor} loading={doctorRunning}>
-            运行诊断
+      {/* System diagnosis card */}
+      <div className="bg-white rounded-[12px] p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)]">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[13px] font-[600] text-text-primary">
+            {t("home.systemDiagnosis")}
+          </span>
+          <Button variant="primary" size="sm" onClick={handleRunDoctor} loading={doctorRunning}>
+            {t("home.runDiagnosis")}
           </Button>
         </div>
 
-        {doctorResults.length > 0 && (
-          <div className="bg-bg-1 rounded-md p-3 space-y-0.5 max-h-48 overflow-y-auto">
-            {doctorResults.map((r, i) => (
-              <LogLine
-                key={i}
-                status={r.status === "ok" ? "ok" : r.status === "fail" ? "fail" : "info"}
-                message={r.message}
-              />
-            ))}
-          </div>
-        )}
+        <div className="space-y-[4px]" aria-live="polite">
+          {doctorResults.map((r) => (
+            <LogLine
+              key={`${r.status}-${r.message}`}
+              status={r.status === "ok" ? "ok" : r.status === "warn" ? "warn" : "fail"}
+              message={r.message}
+            />
+          ))}
+        </div>
 
-        {!isInstalled && !doctorRunning && (
-          <p className="text-text-1 text-[12px]">
-            Hermes 未安装。{" "}
-            <button
-              className="text-cyan underline"
-              onClick={() => setActivePanel("install")}
-            >
-              前往安装
+        {!isInstalled && !doctorRunning && doctorResults.length === 0 && (
+          <p className="text-text-secondary text-[12px] mt-2">
+            {t("home.notInstalledHint")}{" "}
+            <button type="button" className="text-accent underline" onClick={() => setActivePanel("install")}>
+              {t("home.goInstall")}
             </button>
           </p>
         )}
       </div>
 
-      {/* Recent activity */}
-      <RecentActivity />
-
       {/* Quick actions */}
-      <div className="bg-bg-2 border border-white/[0.07] rounded-lg p-4">
-        <h3 className="text-[11px] font-mono uppercase tracking-widest text-text-2 mb-3">快速操作</h3>
-        <div className="flex gap-3">
-          <Button size="sm" onClick={() => setActivePanel("install")}>检查更新</Button>
-          <Button size="sm" onClick={() => setActivePanel("config")}>修改配置</Button>
+      <div className="bg-white rounded-[12px] p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)]">
+        <div className="text-[11px] text-text-tertiary font-[600] tracking-[.3px] uppercase mb-3">
+          {t("home.quickActions")}
         </div>
-      </div>
-    </div>
-  );
-}
-
-// Reads last 10 lines from ~/.hermes/hermes.log via Rust command
-function RecentActivity() {
-  const [lines, setLines] = useState<string[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    import("../../lib/tauri").then(({ Commands }) =>
-      Commands.getRecentActivity()
-        .then((result) => { if (!cancelled) setLines(result); })
-        .catch(() => {})
-    );
-    return () => { cancelled = true; };
-  }, []);
-  if (lines.length === 0) return null;
-  return (
-    <div className="bg-bg-2 border border-white/[0.07] rounded-lg p-4 space-y-2">
-      <h3 className="text-[11px] font-mono uppercase tracking-widest text-text-2">最近活动</h3>
-      <div className="space-y-0.5">
-        {lines.map((l, i) => <LogLine key={i} status="muted" message={l} />)}
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setActivePanel("install")}>
+            {t("home.checkUpdate")}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setActivePanel("config")}>
+            {t("home.editConfig")}
+          </Button>
+        </div>
       </div>
     </div>
   );
