@@ -54,6 +54,7 @@ pub fn run() {
             config::save_config,
             config::save_api_key,
             config::test_api_connection,
+            config::get_system_locale,
             process::run_doctor,
             process::get_recent_activity,
         ])

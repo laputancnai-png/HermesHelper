@@ -32,6 +32,8 @@ pub struct HermesConfig {
     pub command_approval: bool,
     #[serde(default = "default_true")]
     pub budget_warning: bool,
+    #[serde(default = "default_language")]
+    pub language: String,
 }
 
 fn default_provider() -> String { "openrouter".into() }
@@ -39,6 +41,7 @@ fn default_model() -> String { "anthropic/claude-sonnet-4-5".into() }
 fn default_backend() -> String { "local".into() }
 fn default_memory_limit() -> u32 { 5120 }
 fn default_true() -> bool { true }
+fn default_language() -> String { "system".into() }
 
 impl Default for HermesConfig {
     fn default() -> Self {
@@ -51,6 +54,7 @@ impl Default for HermesConfig {
             auto_skill_generation: true,
             command_approval: false,
             budget_warning: true,
+            language: default_language(),
         }
     }
 }
@@ -120,6 +124,19 @@ pub async fn test_api_connection(provider: String, key: String) -> Result<bool, 
     Ok(key.len() > 8)
 }
 
+#[tauri::command]
+pub async fn get_system_locale() -> Result<String, String> {
+    // Check common Unix/macOS locale environment variables in priority order
+    for var in &["LC_ALL", "LC_CTYPE", "LANG"] {
+        if let Ok(val) = std::env::var(var) {
+            if !val.is_empty() && val != "C" && val != "POSIX" {
+                return Ok(val);
+            }
+        }
+    }
+    Ok("en-US".to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -134,6 +151,7 @@ mod tests {
         let loaded = HermesConfig::load_from(&path).unwrap();
         assert_eq!(loaded.provider, "openrouter");
         assert_eq!(loaded.persistent_memory, true);
+        assert_eq!(loaded.language, "system");
     }
 
     #[test]
@@ -142,6 +160,7 @@ mod tests {
         let path = dir.path().join("nonexistent.yaml");
         let cfg = HermesConfig::load_from(&path).unwrap();
         assert_eq!(cfg.provider, "openrouter");
+        assert_eq!(cfg.language, "system");
     }
 
     #[test]
@@ -152,5 +171,24 @@ mod tests {
         std::fs::write(&path, format!("LLM_API_KEY={key}\n")).unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
         assert!(content.contains("LLM_API_KEY=sk-test-1234567890"));
+    }
+
+    #[test]
+    fn test_config_roundtrip_with_language() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("config.yaml");
+        let mut cfg = HermesConfig::default();
+        cfg.language = "en".to_string();
+        cfg.save_to(&path).unwrap();
+        let loaded = HermesConfig::load_from(&path).unwrap();
+        assert_eq!(loaded.language, "en");
+    }
+
+    #[tokio::test]
+    async fn test_get_system_locale_returns_nonempty() {
+        let result = get_system_locale().await;
+        assert!(result.is_ok());
+        let locale = result.unwrap();
+        assert!(!locale.is_empty(), "locale must not be empty");
     }
 }
