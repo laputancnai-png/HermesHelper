@@ -1,0 +1,93 @@
+{
+  "nav": {
+    "home": "Overview",
+    "install": "Install",
+    "config": "Config",
+    "tools": "Tools",
+    "gateway": "Gateway",
+    "migrate": "Migrate",
+    "phase2Coming": "Phase 2 coming soon"
+  },
+  "home": {
+    "installStatus": "Install Status",
+    "currentVersion": "Current Version",
+    "doctorResults": "Doctor Results",
+    "installed": "Installed",
+    "notInstalled": "Not Installed",
+    "running": "Running",
+    "notDetected": "Not Detected",
+    "detected": "Detected",
+    "notRun": "Not Run",
+    "allPassed": "All Passed",
+    "warnings": "warnings",
+    "issues": "issues",
+    "systemDiagnosis": "System Diagnosis",
+    "runDiagnosis": "Run Diagnosis",
+    "notInstalledHint": "Hermes is not installed.",
+    "goInstall": "Go to Install",
+    "quickActions": "Quick Actions",
+    "checkUpdate": "Check for Updates",
+    "editConfig": "Edit Config"
+  },
+  "install": {
+    "selectMode": "Select Install Mode",
+    "mode": {
+      "full": { "label": "Full Install", "desc": "Includes gateway, Cron, CLI tools (~180 MB, recommended)" },
+      "core": { "label": "Core Only",    "desc": "Minimal install, CLI only" },
+      "voice": { "label": "With Voice",  "desc": "Full install + voice transcription module" }
+    },
+    "recommended": "Recommended",
+    "progress": "Install Progress",
+    "done": "Done",
+    "failed": "Failed",
+    "start": "Start Install",
+    "reinstall": "Reinstall",
+    "uninstall": "Uninstall Hermes",
+    "uninstallConfirm": "Are you sure you want to uninstall Hermes? This cannot be undone."
+  },
+  "config": {
+    "llmSection": "LLM Config",
+    "behaviorSection": "Behavior",
+    "generalSection": "General",
+    "providerLabel": "Provider",
+    "modelLabel": "Default Model",
+    "apiKeyLabel": "API Key",
+    "showKey": "Show",
+    "hideKey": "Hide",
+    "testConnection": "Test Connection",
+    "persistentMemory": "Persistent Memory",
+    "persistentMemoryDesc": "Save user preferences and project context across sessions",
+    "autoSkillGen": "Auto Skill Generation",
+    "autoSkillGenDesc": "Automatically extract reusable skill snippets from conversations",
+    "commandApproval": "Command Approval Mode",
+    "commandApprovalDesc": "Require manual confirmation before running terminal commands",
+    "budgetWarning": "Budget Pressure Alert",
+    "budgetWarningDesc": "Remind the agent to consolidate output when nearing iteration limit",
+    "languageLabel": "Language",
+    "saveAll": "Save All Settings",
+    "providers": {
+      "openrouter": "OpenRouter (Recommended)",
+      "google": "Google Gemini",
+      "openai": "OpenAI",
+      "anthropic": "Anthropic",
+      "custom": "Custom Endpoint"
+    },
+    "languages": {
+      "system": "Follow System",
+      "zh": "中文",
+      "en": "English"
+    }
+  },
+  "toast": {
+    "configSaved": "Settings saved",
+    "saveFailed": "Save failed: ",
+    "configLoadFailed": "Failed to load config: ",
+    "connectionOk": "Connection successful ✓",
+    "connectionFail": "Connection failed — check your API key",
+    "testFailed": "Test failed: ",
+    "installSuccess": "Installation complete!",
+    "uninstallSuccess": "Hermes uninstalled",
+    "uninstallFailed": "Uninstall failed: ",
+    "doctorFailed": "Diagnosis failed: "
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "nav": {
+    "home": "总览",
+    "install": "安装",
+    "config": "配置",
+    "tools": "工具",
+    "gateway": "网关",
+    "migrate": "迁移",
+    "phase2Coming": "Phase 2 即将推出"
+  },
+  "home": {
+    "installStatus": "安装状态",
+    "currentVersion": "当前版本",
+    "doctorResults": "诊断结果",
+    "installed": "已安装",
+    "notInstalled": "未安装",
+    "running": "运行中",
+    "notDetected": "未检测到",
+    "detected": "已检测",
+    "notRun": "未运行",
+    "allPassed": "全部通过",
+    "warnings": "项警告",
+    "issues": "项问题",
+    "systemDiagnosis": "系统诊断",
+    "runDiagnosis": "运行诊断",
+    "notInstalledHint": "Hermes 未安装。",
+    "goInstall": "前往安装",
+    "quickActions": "快速操作",
+    "checkUpdate": "检查更新",
+    "editConfig": "修改配置"
+  },
+  "install": {
+    "selectMode": "选择安装模式",
+    "mode": {
+      "full": { "label": "完整安装", "desc": "包含消息网关、Cron、CLI 工具，约 180 MB（推荐）" },
+      "core": { "label": "仅核心",   "desc": "最小安装，仅包含 CLI" },
+      "voice": { "label": "含 Voice", "desc": "完整安装 + 语音转录模块" }
+    },
+    "recommended": "推荐",
+    "progress": "安装进度",
+    "done": "完成",
+    "failed": "失败",
+    "start": "开始安装",
+    "reinstall": "重新安装",
+    "uninstall": "卸载 Hermes",
+    "uninstallConfirm": "确定要卸载 Hermes 吗？此操作不可撤销。"
+  },
+  "config": {
+    "llmSection": "LLM 配置",
+    "behaviorSection": "行为设置",
+    "generalSection": "通用 / General",
+    "providerLabel": "提供商",
+    "modelLabel": "默认模型",
+    "apiKeyLabel": "API Key",
+    "showKey": "显示",
+    "hideKey": "隐藏",
+    "testConnection": "测试连接",
+    "persistentMemory": "持久记忆",
+    "persistentMemoryDesc": "跨会话保存用户偏好和项目上下文",
+    "autoSkillGen": "自动生成技能",
+    "autoSkillGenDesc": "从对话中自动提取可复用技能片段",
+    "commandApproval": "命令审批模式",
+    "commandApprovalDesc": "执行终端命令前需用户手动确认（更安全）",
+    "budgetWarning": "预算压力提示",
+    "budgetWarningDesc": "接近迭代上限时提醒 Agent 合并输出",
+    "languageLabel": "语言 / Language",
+    "saveAll": "保存所有配置",
+    "providers": {
+      "openrouter": "OpenRouter（推荐）",
+      "google": "Google Gemini",
+      "openai": "OpenAI",
+      "anthropic": "Anthropic",
+      "custom": "自定义端点"
+    },
+    "languages": {
+      "system": "跟随系统 / Follow System",
+      "zh": "中文",
+      "en": "English"
+    }
+  },
+  "toast": {
+    "configSaved": "配置已保存",
+    "saveFailed": "保存失败：",
+    "configLoadFailed": "配置加载失败：",
+    "connectionOk": "连接成功 ✓",
+    "connectionFail": "连接失败，请检查 API Key",
+    "testFailed": "测试失败：",
+    "installSuccess": "安装成功！",
+    "uninstallSuccess": "已卸载 Hermes",
+    "uninstallFailed": "卸载失败：",
+    "doctorFailed": "诊断失败："
+  }
+}
