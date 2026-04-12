@@ -10,14 +10,14 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<Variant, string> = {
-  primary: "bg-status-blue/10 text-status-blue border border-status-blue/30 hover:bg-status-blue/20",
-  secondary: "bg-bg-4 text-text-0 border border-white/10 hover:bg-bg-3",
-  danger: "bg-status-red/10 text-status-red border border-status-red/30 hover:bg-status-red/20",
+  primary:   "bg-accent text-white hover:opacity-90",
+  secondary: "bg-bg-window text-text-primary border border-bg-secondary hover:bg-bg-secondary",
+  danger:    "bg-status-red-bg text-status-red border border-[#FFD0D0] hover:opacity-90",
 };
 
 const sizeClasses: Record<Size, string> = {
-  md: "px-4 py-2 text-[12px]",
-  sm: "px-3 py-1.5 text-[11px]",
+  md: "px-4 py-[7px] text-[13px] font-[500]",
+  sm: "px-3 py-[5px] text-[12px] font-[500]",
 };
 
 export function Button({
@@ -32,12 +32,12 @@ export function Button({
   return (
     <button
       disabled={disabled || loading}
-      className={`rounded-md font-ui transition-colors duration-[140ms] ease-[cubic-bezier(0.4,0,0.2,1)]
+      className={`rounded-[8px] transition-opacity duration-200
         disabled:opacity-40 disabled:cursor-not-allowed
         ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
       {...props}
     >
-      {loading ? "…" : children}
+      {loading ? "..." : children}
     </button>
   );
 }
