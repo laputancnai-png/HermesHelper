@@ -6,7 +6,7 @@
 
 **Architecture:** React 18/TypeScript frontend with 6 panels and Zustand state management; Rust backend with 4 command modules for subprocess management and file I/O; Tauri Events for streaming real-time install progress to the frontend.
 
-**Tech Stack:** Tauri 2 · React 18 · TypeScript 5 · Vite 5 · Tailwind CSS 3 · Zustand 4 · serde_yaml 0.9 · Vitest + @testing-library/react · GitHub Actions tauri-action
+**Tech Stack:** Tauri 2 · React 19 · TypeScript 6 · Vite 8 · Tailwind CSS 4 · Zustand 5 · serde_yaml 0.9 · Vitest 4 + @testing-library/react · GitHub Actions tauri-action
 
 **Spec:** `docs/superpowers/specs/2026-04-11-hermes-manager-design.md`
 
