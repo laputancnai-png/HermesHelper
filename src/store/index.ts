@@ -1,36 +1,41 @@
-// Minimal stub — replaced by full Zustand store in Task 6
-import { useState, useCallback } from "react";
+import { create } from "zustand";
+import { createHermesSlice, HermesSlice } from "./hermesSlice";
+import { createConfigSlice, ConfigSlice } from "./configSlice";
+import { createUISlice, UISlice } from "./uiSlice";
 
-export type Panel = "home" | "install" | "config" | "tools" | "gateway" | "migrate";
+export type { Panel } from "./uiSlice";
 
-export interface Toast {
-  message: string;
-  type: "success" | "error" | "info";
-}
+type Store = HermesSlice & ConfigSlice & UISlice;
 
-// Module-level state (stub only — Task 6 replaces with Zustand)
-let _toast: Toast | null = null;
-const _listeners: Set<() => void> = new Set();
+export const useStore = create<Store>()((set) => ({
+  ...createHermesSlice(set as Parameters<typeof createHermesSlice>[0]),
+  ...createConfigSlice(set as Parameters<typeof createConfigSlice>[0]),
+  ...createUISlice(set as Parameters<typeof createUISlice>[0]),
+}));
 
-function notify() { _listeners.forEach(fn => fn()); }
+// Convenience selectors
+export const useHermesStore = () => useStore((s) => ({
+  isInstalled: s.isInstalled,
+  version: s.version,
+  doctorResults: s.doctorResults,
+  doctorRunning: s.doctorRunning,
+  setInstalled: s.setInstalled,
+  setDoctorResults: s.setDoctorResults,
+  setDoctorRunning: s.setDoctorRunning,
+}));
 
-export function useUIStore() {
-  const [, rerender] = useState(0);
-  const listen = useCallback(() => { _listeners.add(() => rerender(n => n + 1)); }, []);
-  // Register listener on first call
-  if (!_listeners.size) listen();
+export const useConfigStore = () => useStore((s) => ({
+  config: s.config,
+  configLoaded: s.configLoaded,
+  setConfig: s.setConfig,
+  updateConfig: s.updateConfig,
+  setConfigLoaded: s.setConfigLoaded,
+}));
 
-  return {
-    activePanel: "home" as Panel,
-    toast: _toast,
-    setActivePanel: (_panel: Panel) => {},
-    showToast: (message: string, type: Toast["type"] = "info") => {
-      _toast = { message, type };
-      notify();
-    },
-    clearToast: () => {
-      _toast = null;
-      notify();
-    },
-  };
-}
+export const useUIStore = () => useStore((s) => ({
+  activePanel: s.activePanel,
+  toast: s.toast,
+  setActivePanel: s.setActivePanel,
+  showToast: s.showToast,
+  clearToast: s.clearToast,
+}));
