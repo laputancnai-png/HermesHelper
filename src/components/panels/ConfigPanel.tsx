@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Commands, HermesConfig } from "../../lib/tauri";
 import { useConfigStore, useUIStore } from "../../store";
 import { Button } from "../ui/Button";
 import { Toggle } from "../ui/Toggle";
 
-const PROVIDERS = [
-  { value: "openrouter", label: "OpenRouter（推荐）" },
-  { value: "google", label: "Google Gemini" },
-  { value: "openai", label: "OpenAI" },
-  { value: "anthropic", label: "Anthropic" },
-  { value: "custom", label: "自定义端点" },
+const PROVIDERS: { value: string; labelKey: string }[] = [
+  { value: "openrouter", labelKey: "config.providers.openrouter" },
+  { value: "google",     labelKey: "config.providers.google" },
+  { value: "openai",     labelKey: "config.providers.openai" },
+  { value: "anthropic",  labelKey: "config.providers.anthropic" },
+  { value: "custom",     labelKey: "config.providers.custom" },
 ];
 
 const MODELS = [
@@ -20,15 +21,20 @@ const MODELS = [
   "meta-llama/llama-3.3-70b",
 ];
 
-const BACKENDS: { value: HermesConfig["backend"]; label: string; disabled?: boolean }[] = [
-  { value: "local", label: "本地（local）" },
-  { value: "docker", label: "Docker 隔离", disabled: true },
-  { value: "ssh", label: "SSH 远程", disabled: true },
-  { value: "modal", label: "Modal 云端", disabled: true },
+const LANGUAGE_OPTIONS: { value: string; labelKey: string }[] = [
+  { value: "system", labelKey: "config.languages.system" },
+  { value: "zh",     labelKey: "config.languages.zh" },
+  { value: "en",     labelKey: "config.languages.en" },
 ];
 
+const INPUT_CLASS =
+  "w-full bg-bg-window border border-bg-secondary rounded-[8px] px-3 py-2 text-[13px] text-text-primary " +
+  "focus:outline-none focus:border-[1.5px] focus:border-accent";
+const LABEL_CLASS = "block text-[12px] text-text-secondary font-[500] mb-[5px]";
+
 export function ConfigPanel() {
-  const { config, setConfig } = useConfigStore();
+  const { t, i18n } = useTranslation();
+  const { config, configLoaded, setConfig } = useConfigStore();
   const { showToast } = useUIStore();
   const [local, setLocal] = useState<HermesConfig>(config);
   const [apiKey, setApiKey] = useState("");
@@ -37,10 +43,22 @@ export function ConfigPanel() {
   const [testing, setTesting] = useState(false);
 
   useEffect(() => {
+    let active = true;
     Commands.getConfig()
-      .then((c) => { setConfig(c); setLocal(c); })
-      .catch((e) => showToast("配置加载失败：" + String(e), "error"));
-  }, [setConfig, showToast]);
+      .then((c) => {
+        if (active) {
+          setConfig(c);
+          setLocal(c);
+        }
+      })
+      .catch((e) => {
+        if (active) {
+          const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
+          showToast(`${t("toast.configLoadFailed")}: ${msg}`, "error");
+        }
+      });
+    return () => { active = false; };
+  }, [setConfig, showToast, t]);
 
   function update<K extends keyof HermesConfig>(key: K, value: HermesConfig[K]) {
     setLocal((prev) => ({ ...prev, [key]: value }));
@@ -52,9 +70,23 @@ export function ConfigPanel() {
       await Commands.saveConfig(local);
       if (apiKey) await Commands.saveApiKey(apiKey);
       setConfig(local);
-      showToast("配置已保存", "success");
+      showToast(t("toast.configSaved"), "success");
+
+      // Apply language change after successful save
+      const lang = local.language ?? "system";
+      if (lang === "system") {
+        try {
+          const locale = await Commands.getSystemLocale();
+          await i18n.changeLanguage(locale.startsWith("zh") ? "zh" : "en");
+        } catch {
+          await i18n.changeLanguage("en");
+        }
+      } else {
+        await i18n.changeLanguage(lang);
+      }
     } catch (e) {
-      showToast("保存失败：" + String(e), "error");
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
+      showToast(`${t("toast.saveFailed")}: ${msg}`, "error");
     } finally {
       setSaving(false);
     }
@@ -64,125 +96,165 @@ export function ConfigPanel() {
     setTesting(true);
     try {
       const ok = await Commands.testApiConnection(local.provider, apiKey);
-      showToast(ok ? "连接成功 ✓" : "连接失败，请检查 API Key", ok ? "success" : "error");
+      showToast(
+        ok ? t("toast.connectionOk") : t("toast.connectionFail"),
+        ok ? "success" : "error"
+      );
     } catch (e) {
-      showToast("测试失败：" + String(e), "error");
+      const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
+      showToast(`${t("toast.testFailed")}: ${msg}`, "error");
     } finally {
       setTesting(false);
     }
   }
 
+  if (!configLoaded) {
+    return (
+      <div className="flex items-center justify-center h-32 text-text-secondary text-[13px]">
+        Loading...
+      </div>
+    );
+  }
+
+  const modelOptions = MODELS.includes(local.model) ? MODELS : [local.model, ...MODELS];
+
   return (
-    <div className="space-y-4 max-w-xl">
-      {/* LLM Provider */}
-      <section className="bg-bg-2 border border-white/[0.07] rounded-lg p-4 space-y-3">
-        <h3 className="text-[11px] font-mono uppercase tracking-widest text-text-2">LLM 提供商</h3>
+    <div className="space-y-3 max-w-2xl">
+      <div className="grid grid-cols-2 gap-3">
+        {/* LLM config card */}
+        <div className="bg-white rounded-[12px] p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)] space-y-3">
+          <div className="text-[11px] text-text-tertiary font-[600] tracking-[.3px] uppercase">
+            {t("config.llmSection")}
+          </div>
 
-        <div className="space-y-2">
-          <label className="block text-[12px] text-text-1">提供商</label>
-          <select
-            value={local.provider}
-            onChange={(e) => update("provider", e.target.value)}
-            className="w-full bg-bg-3 border border-white/[0.1] rounded-md px-3 py-2 text-[12px] text-text-0"
-          >
-            {PROVIDERS.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
-            ))}
-          </select>
-        </div>
+          <div>
+            <label htmlFor="provider-select" className={LABEL_CLASS}>{t("config.providerLabel")}</label>
+            <select
+              id="provider-select"
+              value={local.provider}
+              onChange={(e) => update("provider", e.target.value)}
+              className={INPUT_CLASS}
+            >
+              {PROVIDERS.map((p) => (
+                <option key={p.value} value={p.value}>{t(p.labelKey)}</option>
+              ))}
+            </select>
+          </div>
 
-        <div className="space-y-2">
-          <label className="block text-[12px] text-text-1">默认模型</label>
-          <select
-            value={local.model}
-            onChange={(e) => update("model", e.target.value)}
-            className="w-full bg-bg-3 border border-white/[0.1] rounded-md px-3 py-2 text-[12px] text-text-0"
-          >
-            {MODELS.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </div>
+          <div>
+            <label htmlFor="model-select" className={LABEL_CLASS}>{t("config.modelLabel")}</label>
+            <select
+              id="model-select"
+              value={local.model}
+              onChange={(e) => update("model", e.target.value)}
+              className={INPUT_CLASS}
+            >
+              {modelOptions.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
 
-        <div className="space-y-2">
-          <label className="block text-[12px] text-text-1">API Key</label>
-          <div className="flex gap-2">
-            <input
-              type={showKey ? "text" : "password"}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-or-v1-..."
-              className="flex-1 bg-bg-3 border border-white/[0.1] rounded-md px-3 py-2 text-[12px] text-text-0 font-mono"
-            />
-            <Button size="sm" onClick={() => setShowKey((v) => !v)}>
-              {showKey ? "隐藏" : "显示"}
-            </Button>
-            <Button size="sm" onClick={handleTestConnection} loading={testing}>
-              测试连接
+          <div>
+            <label htmlFor="api-key-input" className={LABEL_CLASS}>{t("config.apiKeyLabel")}</label>
+            <div className="flex gap-2 mb-2">
+              <input
+                id="api-key-input"
+                type={showKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-or-v1-..."
+                className={`${INPUT_CLASS} flex-1 font-mono`}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => setShowKey((v) => !v)}
+              >
+                {showKey ? t("config.hideKey") : t("config.showKey")}
+              </Button>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={handleTestConnection}
+              loading={testing}
+              className="w-full"
+            >
+              {t("config.testConnection")}
             </Button>
           </div>
         </div>
-      </section>
 
-      {/* Sandbox */}
-      <section className="bg-bg-2 border border-white/[0.07] rounded-lg p-4 space-y-3">
-        <h3 className="text-[11px] font-mono uppercase tracking-widest text-text-2">终端沙箱</h3>
-        <div className="space-y-2">
-          <label className="block text-[12px] text-text-1">执行后端</label>
+        {/* Behavior settings card */}
+        <div className="bg-white rounded-[12px] p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)]">
+          <div className="text-[11px] text-text-tertiary font-[600] tracking-[.3px] uppercase mb-3">
+            {t("config.behaviorSection")}
+          </div>
+          <div className="space-y-4 divide-y divide-bg-secondary">
+            <Toggle
+              label={t("config.persistentMemory")}
+              description={t("config.persistentMemoryDesc")}
+              checked={local.persistentMemory}
+              onChange={(v) => update("persistentMemory", v)}
+            />
+            <div className="pt-3">
+              <Toggle
+                label={t("config.autoSkillGen")}
+                description={t("config.autoSkillGenDesc")}
+                checked={local.autoSkillGeneration}
+                onChange={(v) => update("autoSkillGeneration", v)}
+              />
+            </div>
+            <div className="pt-3">
+              <Toggle
+                label={t("config.commandApproval")}
+                description={t("config.commandApprovalDesc")}
+                checked={local.commandApproval}
+                onChange={(v) => update("commandApproval", v)}
+              />
+            </div>
+            <div className="pt-3">
+              <Toggle
+                label={t("config.budgetWarning")}
+                description={t("config.budgetWarningDesc")}
+                checked={local.budgetWarning}
+                onChange={(v) => update("budgetWarning", v)}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* General settings card — language */}
+      <div className="bg-white rounded-[12px] p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)]">
+        <div className="text-[11px] text-text-tertiary font-[600] tracking-[.3px] uppercase mb-3">
+          {t("config.generalSection")}
+        </div>
+        <div style={{ maxWidth: 280 }}>
+          <label htmlFor="language-select" className={LABEL_CLASS}>{t("config.languageLabel")}</label>
           <select
-            value={local.backend}
-            onChange={(e) => update("backend", e.target.value as HermesConfig["backend"])}
-            className="w-full bg-bg-3 border border-white/[0.1] rounded-md px-3 py-2 text-[12px] text-text-0"
+            id="language-select"
+            value={local.language ?? "system"}
+            onChange={(e) => update("language", e.target.value)}
+            className={INPUT_CLASS}
           >
-            {BACKENDS.map((b) => (
-              <option key={b.value} value={b.value} disabled={b.disabled}>
-                {b.label}{b.disabled ? "（Phase 3）" : ""}
-              </option>
+            {LANGUAGE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
             ))}
           </select>
         </div>
+      </div>
 
-        <div className="space-y-2">
-          <label className="block text-[12px] text-text-1">内存限制（MB）</label>
-          <input
-            type="number"
-            min={512}
-            value={local.memoryLimitMb}
-            onChange={(e) => update("memoryLimitMb", Number(e.target.value))}
-            className="w-full bg-bg-3 border border-white/[0.1] rounded-md px-3 py-2 text-[12px] text-text-0 font-mono"
-          />
-        </div>
-      </section>
-
-      {/* Behaviour toggles */}
-      <section className="bg-bg-2 border border-white/[0.07] rounded-lg p-4 space-y-4">
-        <h3 className="text-[11px] font-mono uppercase tracking-widest text-text-2">行为设置</h3>
-        <Toggle
-          label="持久记忆"
-          description="跨会话保存用户偏好和项目上下文"
-          checked={local.persistentMemory}
-          onChange={(v) => update("persistentMemory", v)}
-        />
-        <Toggle
-          label="自动生成技能"
-          description="从对话中自动提取可复用技能片段"
-          checked={local.autoSkillGeneration}
-          onChange={(v) => update("autoSkillGeneration", v)}
-        />
-        <Toggle
-          label="命令审批模式"
-          description="执行终端命令前需用户手动确认（更安全）"
-          checked={local.commandApproval}
-          onChange={(v) => update("commandApproval", v)}
-        />
-        <Toggle
-          label="预算压力提示"
-          description="接近迭代上限时提醒 Agent 合并输出"
-          checked={local.budgetWarning}
-          onChange={(v) => update("budgetWarning", v)}
-        />
-      </section>
-
-      <Button variant="primary" onClick={handleSave} loading={saving} className="w-full">
-        保存所有配置
+      {/* Save button */}
+      <Button
+        type="button"
+        variant="primary"
+        onClick={handleSave}
+        loading={saving}
+        className="w-full rounded-[10px] py-3 text-[14px]"
+      >
+        {t("config.saveAll")}
       </Button>
     </div>
   );

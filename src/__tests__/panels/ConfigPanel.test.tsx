@@ -13,6 +13,7 @@ const defaultConfig = {
   autoSkillGeneration: true,
   commandApproval: false,
   budgetWarning: true,
+  language: "system",
 };
 
 beforeEach(() => {
@@ -30,13 +31,13 @@ describe("ConfigPanel", () => {
 
   it("shows save button", async () => {
     render(<ConfigPanel />);
-    await waitFor(() => expect(screen.getByText("保存所有配置")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("config.saveAll")).toBeInTheDocument());
   });
 
   it("calls save_config on save click", async () => {
     render(<ConfigPanel />);
-    await waitFor(() => screen.getByText("保存所有配置"));
-    fireEvent.click(screen.getByText("保存所有配置"));
+    await waitFor(() => screen.getByText("config.saveAll"));
+    fireEvent.click(screen.getByText("config.saveAll"));
     await waitFor(() =>
       expect(mockInvoke).toHaveBeenCalledWith("save_config", expect.any(Object))
     );

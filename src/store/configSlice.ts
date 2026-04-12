@@ -9,6 +9,7 @@ const DEFAULT_CONFIG: HermesConfig = {
   autoSkillGeneration: true,
   commandApproval: false,
   budgetWarning: true,
+  language: "system",
 };
 
 export interface ConfigSlice {
