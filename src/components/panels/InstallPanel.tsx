@@ -1,28 +1,28 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Commands, Events, InstallMode, InstallProgress } from "../../lib/tauri";
 import { useUIStore } from "../../store";
 import { Button } from "../ui/Button";
-import { LogLine } from "../ui/LogLine";
 import { Badge } from "../ui/Badge";
-
-const MODES: { id: InstallMode; label: string; description: string }[] = [
-  { id: "full", label: "完整安装", description: "包含消息网关、Cron、CLI 工具，约 180 MB（推荐）" },
-  { id: "core", label: "仅核心", description: "最小安装，仅包含 CLI" },
-  { id: "voice", label: "含 Voice", description: "完整安装 + 语音转录模块" },
-];
 
 type Phase = "idle" | "installing" | "done" | "error";
 
+const MODES: { id: InstallMode; labelKey: string; descKey: string }[] = [
+  { id: "full",  labelKey: "install.mode.full.label",  descKey: "install.mode.full.desc" },
+  { id: "core",  labelKey: "install.mode.core.label",  descKey: "install.mode.core.desc" },
+  { id: "voice", labelKey: "install.mode.voice.label", descKey: "install.mode.voice.desc" },
+];
+
 export function InstallPanel() {
+  const { t } = useTranslation();
   const { showToast } = useUIStore();
   const [selectedMode, setSelectedMode] = useState<InstallMode>("full");
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);
-  const [logs, setLogs] = useState<InstallProgress[]>([]);
+  const [logs, setLogs] = useState<Array<InstallProgress & { id: number }>>([]);
   const [errorMsg, setErrorMsg] = useState("");
   const logRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll logs
   useEffect(() => {
     const el = logRef.current;
     if (el && typeof el.scrollTo === "function") {
@@ -31,23 +31,20 @@ export function InstallPanel() {
   }, [logs]);
 
   async function handleInstall() {
+    if (phase === "installing") return;  // re-entrancy guard (Fix I4)
     setPhase("installing");
     setLogs([]);
     setProgress(0);
 
-    // Start the install command immediately (invoke is recorded synchronously by the mock)
-    const installPromise = Commands.installHermes(selectedMode);
-
-    // Set up event listeners in parallel
     const [unlistenProgress, unlistenDone, unlistenError] = await Promise.all([
       Events.onInstallProgress((p) => {
-        setLogs((prev) => [...prev, p]);
+        setLogs((prev) => [...prev, { ...p, id: prev.length }]);
         setProgress(p.pct);
       }),
       Events.onInstallDone(() => {
         setPhase("done");
         setProgress(100);
-        showToast("安装成功！", "success");
+        showToast(t("toast.installSuccess"), "success");
       }),
       Events.onInstallError((msg) => {
         setPhase("error");
@@ -57,10 +54,12 @@ export function InstallPanel() {
     ]);
 
     try {
-      await installPromise;
+      await Commands.installHermes(selectedMode);
     } catch (e) {
       setPhase("error");
-      setErrorMsg(String(e));
+      const errMsg = e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
+      setErrorMsg(errMsg);
+      showToast(errMsg, "error");  // Fix I1: add showToast to catch path
     } finally {
       unlistenProgress();
       unlistenDone();
@@ -69,85 +68,115 @@ export function InstallPanel() {
   }
 
   async function handleUninstall() {
-    if (!confirm("确定要卸载 Hermes 吗？此操作不可撤销。")) return;
+    if (!confirm(t("install.uninstallConfirm"))) return;
     try {
       await Commands.uninstallHermes();
-      showToast("已卸载 Hermes", "success");
+      showToast(t("toast.uninstallSuccess"), "success");
     } catch (e) {
-      showToast("卸载失败：" + String(e), "error");
+      const errMsg = e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
+      showToast(`${t("toast.uninstallFailed")}: ${errMsg}`, "error");
     }
   }
 
+  const progressBadgeStatus: "green" | "red" | "accent" =
+    phase === "done" ? "green" : phase === "error" ? "red" : "accent";
+  const progressBadgeText =
+    phase === "done" ? t("install.done") :
+    phase === "error" ? t("install.failed") :
+    `${progress}%`;
+
   return (
-    <div className="space-y-5 max-w-2xl">
-      {/* Mode selection */}
-      <div className="bg-bg-2 border border-white/[0.07] rounded-lg p-4 space-y-3">
-        <h3 className="text-[11px] font-mono uppercase tracking-widest text-text-2">选择安装模式</h3>
+    <div className="space-y-3 max-w-2xl">
+      {/* Mode selection card */}
+      <div className="bg-white rounded-[12px] p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)]">
+        <div className="text-[11px] text-text-tertiary font-[600] tracking-[.3px] uppercase mb-3">
+          {t("install.selectMode")}
+        </div>
         <div className="space-y-2">
           {MODES.map((m) => (
             <label
               key={m.id}
-              className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors duration-app ease-app
-                ${
-                  selectedMode === m.id
-                    ? "bg-cyan/[0.06] border-cyan/30"
-                    : "bg-bg-3 border-white/[0.07] hover:bg-bg-4"
-                }`}
+              className={`flex items-start gap-3 p-3 rounded-[10px] border cursor-pointer transition-colors duration-150 ${
+                selectedMode === m.id
+                  ? "bg-accent-light border-accent border-[1.5px]"
+                  : "bg-white border-bg-secondary hover:bg-bg-window"
+              }`}
             >
-              <input
-                type="radio"
-                name="mode"
-                value={m.id}
-                checked={selectedMode === m.id}
-                onChange={() => setSelectedMode(m.id)}
-                className="mt-0.5 accent-cyan"
-              />
+              {/* Custom radio button */}
+              <div className="mt-[2px] flex-shrink-0">
+                <input
+                  type="radio"
+                  name="mode"
+                  value={m.id}
+                  checked={selectedMode === m.id}
+                  onChange={() => setSelectedMode(m.id)}
+                  className="sr-only"
+                />
+                <div
+                  className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    selectedMode === m.id
+                      ? "border-accent bg-accent"
+                      : "border-bg-secondary bg-white"
+                  }`}
+                >
+                  {selectedMode === m.id && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                  )}
+                </div>
+              </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-text-0 text-[13px] font-semibold">{m.label}</span>
-                  {m.id === "full" && <Badge status="blue">推荐</Badge>}
+                  <span className="text-text-primary text-[13px] font-[500]">
+                    {t(m.labelKey)}
+                  </span>
+                  {m.id === "full" && (
+                    <Badge status="accent">{t("install.recommended")}</Badge>
+                  )}
                 </div>
-                <p className="text-text-1 text-[11px] mt-0.5">{m.description}</p>
+                <p className="text-text-secondary text-[11px] mt-[3px]">{t(m.descKey)}</p>
               </div>
             </label>
           ))}
         </div>
       </div>
 
-      {/* Progress */}
+      {/* Progress card — only shown during/after install */}
       {(phase === "installing" || phase === "done" || phase === "error") && (
-        <div className="bg-bg-2 border border-white/[0.07] rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-[11px] font-mono uppercase tracking-widest text-text-2">安装进度</h3>
-            <Badge status={phase === "done" ? "green" : phase === "error" ? "red" : "blue"}>
-              {phase === "done" ? "完成" : phase === "error" ? "失败" : `${progress}%`}
-            </Badge>
+        <div className="bg-white rounded-[12px] p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)]">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[13px] font-[600] text-text-primary">
+              {t("install.progress")}
+            </span>
+            <Badge status={progressBadgeStatus}>{progressBadgeText}</Badge>
           </div>
-
-          {/* Progress bar */}
-          <div className="h-1 bg-bg-4 rounded-full overflow-hidden">
+          {/* Gradient progress bar */}
+          <div className="h-[6px] bg-bg-secondary rounded-[3px] overflow-hidden mb-3">
             <div
-              className={`h-full rounded-full transition-all duration-300 ${
-                phase === "error" ? "bg-status-red" : "bg-cyan"
+              className={`h-full rounded-[3px] transition-all duration-300 ${
+                phase === "error"
+                  ? "bg-status-red"
+                  : "bg-gradient-to-r from-accent to-[#4ECDE4]"
               }`}
               style={{ width: `${progress}%` }}
             />
           </div>
-
-          {/* Log output */}
+          {/* Log scroll area */}
           <div
             ref={logRef}
-            className="bg-bg-1 rounded-md p-3 max-h-48 overflow-y-auto space-y-0.5"
+            className="max-h-[160px] overflow-y-auto space-y-[2px] font-mono text-[12px] text-text-secondary"
+            aria-live="polite"
           >
-            {logs.map((l, i) => (
-              <LogLine key={i} status="muted" message={l.line} />
+            {logs.map((l) => (
+              <div key={l.id}>{l.line}</div>
             ))}
-            {phase === "error" && <LogLine status="fail" message={errorMsg} />}
+            {phase === "error" && (
+              <div className="text-status-red">❌ {errorMsg}</div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Actions */}
+      {/* Action row */}
       <div className="flex items-center justify-between">
         <Button
           variant="primary"
@@ -155,11 +184,15 @@ export function InstallPanel() {
           disabled={phase === "installing"}
           loading={phase === "installing"}
         >
-          {phase === "done" ? "重新安装" : "开始安装"}
+          {phase === "done" ? t("install.reinstall") : t("install.start")}
         </Button>
-
-        <Button variant="danger" size="sm" onClick={handleUninstall} disabled={phase === "installing"}>
-          卸载 Hermes
+        <Button
+          variant="danger"
+          size="sm"
+          onClick={handleUninstall}
+          disabled={phase === "installing"}
+        >
+          {t("install.uninstall")}
         </Button>
       </div>
     </div>

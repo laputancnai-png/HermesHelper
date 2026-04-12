@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { InstallPanel } from "../../components/panels/InstallPanel";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -12,28 +12,30 @@ beforeEach(() => {
 });
 
 describe("InstallPanel", () => {
-  it("renders wizard step 1", async () => {
+  it("renders mode selection heading", async () => {
     render(<InstallPanel />);
-    expect(screen.getByText(/选择安装模式/)).toBeInTheDocument();
+    expect(screen.getByText("install.selectMode")).toBeInTheDocument();
   });
 
   it("shows install mode options", () => {
     render(<InstallPanel />);
-    expect(screen.getByText("完整安装")).toBeInTheDocument();
-    expect(screen.getByText("仅核心")).toBeInTheDocument();
-    expect(screen.getByText("含 Voice")).toBeInTheDocument();
+    expect(screen.getByText("install.mode.full.label")).toBeInTheDocument();
+    expect(screen.getByText("install.mode.core.label")).toBeInTheDocument();
+    expect(screen.getByText("install.mode.voice.label")).toBeInTheDocument();
   });
 
   it("enables start button when mode selected", () => {
     render(<InstallPanel />);
-    const btn = screen.getByText("开始安装");
+    const btn = screen.getByText("install.start");
     expect(btn).not.toBeDisabled();
   });
 
   it("calls install_hermes on start", async () => {
     mockInvoke.mockResolvedValueOnce({ os: "macos", arch: "arm64", osVersion: "" });
     render(<InstallPanel />);
-    fireEvent.click(screen.getByText("开始安装"));
-    expect(mockInvoke).toHaveBeenCalledWith("install_hermes", { mode: "full" });
+    fireEvent.click(screen.getByText("install.start"));
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("install_hermes", { mode: "full" });
+    });
   });
 });
