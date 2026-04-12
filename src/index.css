@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&display=swap");
 
 @import "tailwindcss";
 
@@ -13,17 +13,28 @@
   /* Accent colors */
   --color-cyan: #00d4ff;
   --color-cyan-dim: #0099cc;
+  --color-cyan-glow: rgba(0, 212, 255, 0.12);
+  --color-cyan-glow-hi: rgba(0, 212, 255, 0.22);
 
   /* Text colors */
   --color-text-0: #e6edf3;
   --color-text-1: #8b949e;
   --color-text-2: #484f58;
 
+  /* Border colors */
+  --color-border: rgba(255, 255, 255, 0.07);
+  --color-border-hi: rgba(0, 212, 255, 0.3);
+
   /* Status colors */
   --color-status-green: #3fb950;
   --color-status-yellow: #d29922;
   --color-status-red: #f85149;
   --color-status-blue: #58a6ff;
+
+  /* Status backgrounds */
+  --color-green-bg: rgba(63, 185, 80, 0.1);
+  --color-yellow-bg: rgba(210, 153, 34, 0.1);
+  --color-red-bg: rgba(248, 81, 73, 0.1);
 
   /* Fonts */
   --font-ui: "Syne", sans-serif;
@@ -64,10 +75,10 @@ html, body, #root {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #21262d;
+  background: var(--color-bg-4);
   border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #484f58;
+  background: var(--color-text-2);
 }
