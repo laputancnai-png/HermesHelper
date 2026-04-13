@@ -68,6 +68,12 @@ export const Commands = {
 
   getSystemLocale: (): Promise<string> =>
     tauriInvoke("get_system_locale"),
+
+  getTools: (): Promise<string[]> =>
+    tauriInvoke("get_tools"),
+
+  saveTools: (toolsets: string[]): Promise<void> =>
+    tauriInvoke("save_tools", { toolsets }),
 };
 
 // ── Events ────────────────────────────────────────────────────

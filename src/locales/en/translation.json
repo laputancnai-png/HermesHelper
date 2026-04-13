@@ -78,6 +78,25 @@
       "en": "English"
     }
   },
+  "tools": {
+    "coreSection": "Core Tools",
+    "optionalSection": "Optional Tools",
+    "saved": "Saved",
+    "loadFailed": "Failed to load tool config",
+    "saveFailed": "Save failed",
+    "terminal":  { "label": "Terminal",             "desc": "Run commands and manage processes" },
+    "file":      { "label": "File Operations",      "desc": "Read, write, and search local files" },
+    "web":       { "label": "Web Search",           "desc": "Search the web and extract content" },
+    "memory":    { "label": "Persistent Memory",    "desc": "Save user preferences across sessions" },
+    "skills":    { "label": "Skills Library",       "desc": "Load skill documents" },
+    "todo":      { "label": "Task Planning",        "desc": "Multi-step task tracking" },
+    "cronjob":   { "label": "Scheduled Tasks",      "desc": "Create and manage cron jobs" },
+    "browser":   { "label": "Browser Automation",   "desc": "Requires BROWSERBASE_API_KEY" },
+    "vision":    { "label": "Image Analysis",       "desc": "Requires OPENROUTER_API_KEY" },
+    "image_gen": { "label": "Image Generation",     "desc": "Requires FAL_KEY" },
+    "tts":       { "label": "Text-to-Speech",       "desc": "Edge TTS free; paid providers need API Key" },
+    "moa":       { "label": "Multi-Model Reasoning","desc": "Mixture of Agents, requires OPENROUTER_API_KEY" }
+  },
   "toast": {
     "configSaved": "Settings saved",
     "saveFailed": "Save failed: ",

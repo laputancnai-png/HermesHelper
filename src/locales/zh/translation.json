@@ -78,6 +78,25 @@
       "en": "English"
     }
   },
+  "tools": {
+    "coreSection": "核心工具",
+    "optionalSection": "可选工具",
+    "saved": "已保存",
+    "loadFailed": "工具配置加载失败",
+    "saveFailed": "保存失败",
+    "terminal":  { "label": "终端执行",      "desc": "运行命令、管理进程" },
+    "file":      { "label": "文件操作",      "desc": "读写、搜索本地文件" },
+    "web":       { "label": "网页搜索",      "desc": "搜索 + 内容提取" },
+    "memory":    { "label": "持久记忆",      "desc": "跨会话保存用户偏好" },
+    "skills":    { "label": "技能库",        "desc": "加载 skill 文档" },
+    "todo":      { "label": "任务规划",      "desc": "多步骤任务追踪" },
+    "cronjob":   { "label": "定时任务",      "desc": "创建/管理计划任务" },
+    "browser":   { "label": "浏览器自动化",  "desc": "需要 BROWSERBASE_API_KEY" },
+    "vision":    { "label": "图像分析",      "desc": "需要 OPENROUTER_API_KEY" },
+    "image_gen": { "label": "图像生成",      "desc": "需要 FAL_KEY" },
+    "tts":       { "label": "语音合成",      "desc": "Edge TTS 免费；付费 provider 需 API Key" },
+    "moa":       { "label": "多模型推理",    "desc": "Mixture of Agents，需要 OPENROUTER_API_KEY" }
+  },
   "toast": {
     "configSaved": "配置已保存",
     "saveFailed": "保存失败：",
