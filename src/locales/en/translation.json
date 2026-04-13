@@ -82,6 +82,7 @@
     "coreSection": "Core Tools",
     "optionalSection": "Optional Tools",
     "saved": "Saved",
+    "loading": "Loading...",
     "loadFailed": "Failed to load tool config",
     "saveFailed": "Save failed",
     "terminal":  { "label": "Terminal",             "desc": "Run commands and manage processes" },

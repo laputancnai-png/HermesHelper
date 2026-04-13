@@ -53,13 +53,20 @@ export function ToolsPanel() {
         }
       });
     return () => { active = false; };
-  }, [showToast, t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    };
+  }, []);
 
   async function handleToggle(id: ToolId, checked: boolean) {
-    const prev = new Set(activeToolsets);
     const next = new Set(activeToolsets);
     if (checked) next.add(id);
     else next.delete(id);
+
     setActiveToolsets(next);
 
     try {
@@ -67,8 +74,14 @@ export function ToolsPanel() {
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       setShowSaved(true);
       savedTimerRef.current = setTimeout(() => setShowSaved(false), 1500);
-    } catch (e: unknown) {
-      setActiveToolsets(prev);
+    } catch (e) {
+      // rollback: invert only this toggle
+      setActiveToolsets((current) => {
+        const rolled = new Set(current);
+        if (checked) rolled.delete(id);
+        else rolled.add(id);
+        return rolled;
+      });
       const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
       showToast(`${t("tools.saveFailed")}: ${msg}`, "error");
     }
@@ -77,7 +90,7 @@ export function ToolsPanel() {
   if (!loaded) {
     return (
       <div className="flex items-center justify-center h-32 text-text-secondary text-[13px]">
-        Loading...
+        {t("tools.loading")}
       </div>
     );
   }

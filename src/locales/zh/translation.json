@@ -82,6 +82,7 @@
     "coreSection": "核心工具",
     "optionalSection": "可选工具",
     "saved": "已保存",
+    "loading": "加载中...",
     "loadFailed": "工具配置加载失败",
     "saveFailed": "保存失败",
     "terminal":  { "label": "终端执行",      "desc": "运行命令、管理进程" },
