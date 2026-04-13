@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{config, installer, process};
+use commands::{config, installer, process, tools};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -57,6 +57,8 @@ pub fn run() {
             config::get_system_locale,
             process::run_doctor,
             process::get_recent_activity,
+            tools::get_tools,
+            tools::save_tools,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
