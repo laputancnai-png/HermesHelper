@@ -1,15 +1,24 @@
 use std::path::{Path, PathBuf};
 
-fn cli_config_path() -> PathBuf {
+fn cli_config_path() -> Result<PathBuf, String> {
     dirs::home_dir()
-        .unwrap_or_default()
-        .join(".hermes")
-        .join("cli-config.yaml")
+        .ok_or_else(|| "Could not determine home directory".to_string())
+        .map(|h| h.join(".hermes").join("cli-config.yaml"))
 }
 
 pub(crate) const ALL_KNOWN_TOOLSETS: &[&str] = &[
-    "terminal", "file", "web", "memory", "skills", "todo", "cronjob",
-    "browser", "vision", "image_gen", "tts", "moa",
+    "terminal",
+    "file",
+    "web",
+    "memory",
+    "skills",
+    "todo",
+    "cronjob",
+    "browser",
+    "vision",
+    "image_gen",
+    "tts",
+    "moa",
 ];
 
 pub(crate) fn get_tools_from(path: &Path) -> Result<Vec<String>, String> {
@@ -56,24 +65,26 @@ pub(crate) fn save_tools_to(path: &Path, toolsets: &[String]) -> Result<(), Stri
     );
 
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create directory: {e}"))?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {e}"))?;
     }
 
-    let content = serde_yaml::to_string(&value)
-        .map_err(|e| format!("Failed to serialize: {e}"))?;
-    std::fs::write(path, content)
-        .map_err(|e| format!("Failed to write cli-config.yaml: {e}"))
+    let content = serde_yaml::to_string(&value).map_err(|e| format!("Failed to serialize: {e}"))?;
+    std::fs::write(path, content).map_err(|e| format!("Failed to write cli-config.yaml: {e}"))
 }
 
 #[tauri::command]
 pub async fn get_tools() -> Result<Vec<String>, String> {
-    get_tools_from(&cli_config_path())
+    get_tools_from(&cli_config_path()?)
 }
 
 #[tauri::command]
 pub async fn save_tools(toolsets: Vec<String>) -> Result<(), String> {
-    save_tools_to(&cli_config_path(), &toolsets)
+    for t in &toolsets {
+        if !ALL_KNOWN_TOOLSETS.contains(&t.as_str()) {
+            return Err(format!("Unknown toolset: {t}"));
+        }
+    }
+    save_tools_to(&cli_config_path()?, &toolsets)
 }
 
 #[cfg(test)]
@@ -130,7 +141,10 @@ mod tests {
         .unwrap();
         save_tools_to(&path, &["terminal".to_string(), "file".to_string()]).unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
-        assert!(content.contains("claude-opus"), "model field must be preserved");
+        assert!(
+            content.contains("claude-opus"),
+            "model field must be preserved"
+        );
         let loaded = get_tools_from(&path).unwrap();
         assert_eq!(loaded, vec!["terminal", "file"]);
     }
