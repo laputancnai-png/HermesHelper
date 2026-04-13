@@ -33,6 +33,20 @@ export interface InstallProgress {
 
 export type InstallMode = "full" | "core" | "voice";
 
+export type ToolId =
+  | "terminal"
+  | "file"
+  | "web"
+  | "memory"
+  | "skills"
+  | "todo"
+  | "cronjob"
+  | "browser"
+  | "vision"
+  | "image_gen"
+  | "tts"
+  | "moa";
+
 // ── Commands ──────────────────────────────────────────────────
 
 export const Commands = {
@@ -69,10 +83,10 @@ export const Commands = {
   getSystemLocale: (): Promise<string> =>
     tauriInvoke("get_system_locale"),
 
-  getTools: (): Promise<string[]> =>
+  getTools: (): Promise<ToolId[]> =>
     tauriInvoke("get_tools"),
 
-  saveTools: (toolsets: string[]): Promise<void> =>
+  saveTools: (toolsets: ToolId[]): Promise<void> =>
     tauriInvoke("save_tools", { toolsets }),
 };
 
