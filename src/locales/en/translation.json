@@ -31,8 +31,9 @@
   },
   "install": {
     "about": "About Installation",
-    "aboutDesc": "Click \"Start Install\" to download and install Hermes Agent via the official install script. Restart your terminal after installation for the hermes command to take effect.",
+    "aboutDesc": "Click \"Start Install\" to automatically download and install Hermes Agent via the official script. This typically takes 3–10 minutes depending on your network speed.",
     "progress": "Install Progress",
+    "waiting": "Installing, please wait…",
     "done": "Done",
     "failed": "Failed",
     "start": "Start Install",

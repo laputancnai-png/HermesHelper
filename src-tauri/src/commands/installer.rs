@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::process::Stdio;
 use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -17,6 +18,25 @@ pub struct InstallProgress {
     pub pct: u8,
 }
 
+/// Strip ANSI escape codes so raw script output is readable in the UI log.
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Skip everything up to and including the final alphabetic character
+            for ch in chars.by_ref() {
+                if ch.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else if c != '\r' {
+            out.push(c);
+        }
+    }
+    out
+}
+
 fn parse_version(output: &str) -> Option<String> {
     for line in output.lines() {
         let line = line.trim();
@@ -25,6 +45,23 @@ fn parse_version(output: &str) -> Option<String> {
             return Some(version.to_string());
         }
     }
+    None
+}
+
+/// Try to find the hermes binary without relying on the GUI app's PATH.
+/// The install script puts it in ~/.local/bin/hermes on Linux/macOS.
+fn hermes_binary_path() -> Option<PathBuf> {
+    let home = dirs::home_dir()?;
+    let candidates = [
+        home.join(".local/bin/hermes"),
+        home.join(".hermes/bin/hermes"),
+    ];
+    for p in &candidates {
+        if p.exists() {
+            return Some(p.clone());
+        }
+    }
+    // Fall back to PATH lookup
     None
 }
 
@@ -47,14 +84,24 @@ pub async fn detect_platform() -> Result<PlatformInfo, String> {
 
 #[tauri::command]
 pub async fn check_hermes_version() -> Result<Option<String>, String> {
-    let output = Command::new("hermes")
-        .arg("--version")
-        .output()
-        .await
-        .map_err(|_| "hermes not found".to_string())?;
+    // Try known install paths first (GUI app may not have updated PATH)
+    if let Some(bin) = hermes_binary_path() {
+        if let Ok(output) = Command::new(&bin).arg("--version").output().await {
+            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+            if let Some(v) = parse_version(&stdout) {
+                return Ok(Some(v));
+            }
+        }
+    }
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    Ok(parse_version(&stdout))
+    // Fall back to PATH
+    match Command::new("hermes").arg("--version").output().await {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+            Ok(parse_version(&stdout))
+        }
+        Err(_) => Ok(None),
+    }
 }
 
 #[tauri::command]
@@ -62,25 +109,55 @@ pub async fn install_hermes(window: tauri::Window) -> Result<(), String> {
     let install_url =
         "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh";
 
-    // Merge stderr into stdout (2>&1) so all installer output is captured.
+    // ── Step 1: download script ────────────────────────────────────────
+    let emit = |line: &str, pct: u8| {
+        window
+            .emit("install_progress", InstallProgress { line: line.to_string(), pct })
+            .ok();
+    };
+
+    emit("正在下载安装脚本...", 3);
+
+    let tmp = std::env::temp_dir().join("hermes_install.sh");
+    let dl = Command::new("curl")
+        .args(["-fsSL", install_url, "-o", tmp.to_str().unwrap_or("/tmp/hermes_install.sh")])
+        .output()
+        .await
+        .map_err(|e| format!("curl not found: {e}"))?;
+
+    if !dl.status.success() {
+        let err = String::from_utf8_lossy(&dl.stderr);
+        let msg = format!("下载失败: {err}");
+        window.emit("install_error", &msg).ok();
+        return Err(msg);
+    }
+
+    emit("安装脚本下载完成，开始安装（这可能需要几分钟）...", 8);
+
+    // ── Step 2: run script, capturing merged stdout+stderr ─────────────
     let mut child = Command::new("bash")
-        .args(["-c", &format!("curl -fsSL {install_url} | bash 2>&1")])
+        .args(["-c", &format!("bash {} 2>&1", tmp.to_str().unwrap_or("/tmp/hermes_install.sh"))])
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
-        .map_err(|e| format!("Failed to start installer: {e}"))?;
+        .map_err(|e| format!("Failed to run installer: {e}"))?;
 
     let stdout = child.stdout.take().ok_or("no stdout")?;
     let mut reader = BufReader::new(stdout).lines();
-    let mut line_count: u8 = 0;
+    let mut line_count: u8 = 8;
 
-    while let Some(line) = reader.next_line().await.map_err(|e| e.to_string())? {
-        line_count = line_count.saturating_add(2).min(95);
+    while let Some(raw) = reader.next_line().await.map_err(|e| e.to_string())? {
+        let line = strip_ansi(&raw);
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        line_count = line_count.saturating_add(1).min(95);
         window
             .emit(
                 "install_progress",
                 InstallProgress {
-                    line: line.clone(),
+                    line: line.to_string(),
                     pct: line_count,
                 },
             )
@@ -88,11 +165,15 @@ pub async fn install_hermes(window: tauri::Window) -> Result<(), String> {
     }
 
     let status = child.wait().await.map_err(|e| e.to_string())?;
+
+    // Clean up temp script
+    let _ = std::fs::remove_file(&tmp);
+
     if status.success() {
         window.emit("install_done", ()).map_err(|e| e.to_string())?;
         Ok(())
     } else {
-        let msg = "Installation failed — check logs above".to_string();
+        let msg = "安装失败，请查看上方日志".to_string();
         window.emit("install_error", &msg).map_err(|e| e.to_string())?;
         Err(msg)
     }
@@ -137,5 +218,23 @@ mod tests {
         let output = "command not found";
         let version = parse_version(output);
         assert_eq!(version, None);
+    }
+
+    #[test]
+    fn test_strip_ansi_removes_color_codes() {
+        let input = "\x1b[32mSuccess\x1b[0m: installed";
+        assert_eq!(strip_ansi(input), "Success: installed");
+    }
+
+    #[test]
+    fn test_strip_ansi_removes_carriage_return() {
+        let input = "line\r";
+        assert_eq!(strip_ansi(input), "line");
+    }
+
+    #[test]
+    fn test_strip_ansi_plain_text_unchanged() {
+        let input = "Installing dependencies...";
+        assert_eq!(strip_ansi(input), "Installing dependencies...");
     }
 }

@@ -7,6 +7,11 @@ import { Badge } from "../ui/Badge";
 
 type Phase = "idle" | "installing" | "done" | "error";
 
+function formatElapsed(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
 export function InstallPanel() {
   const { t } = useTranslation();
   const { showToast } = useUIStore();
@@ -14,8 +19,11 @@ export function InstallPanel() {
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<Array<InstallProgress & { id: number }>>([]);
   const [errorMsg, setErrorMsg] = useState("");
+  const [elapsed, setElapsed] = useState(0);
   const logRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Auto-scroll log to bottom
   useEffect(() => {
     const el = logRef.current;
     if (el && typeof el.scrollTo === "function") {
@@ -23,11 +31,28 @@ export function InstallPanel() {
     }
   }, [logs]);
 
+  // Elapsed timer: starts when installing, stops on done/error
+  useEffect(() => {
+    if (phase === "installing") {
+      setElapsed(0);
+      timerRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [phase]);
+
   async function handleInstall() {
-    if (phase === "installing") return;  // re-entrancy guard (Fix I4)
+    if (phase === "installing") return;
     setPhase("installing");
     setLogs([]);
     setProgress(0);
+    setErrorMsg("");
 
     const [unlistenProgress, unlistenDone, unlistenError] = await Promise.all([
       Events.onInstallProgress((p) => {
@@ -52,7 +77,7 @@ export function InstallPanel() {
       setPhase("error");
       const errMsg = e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
       setErrorMsg(errMsg);
-      showToast(errMsg, "error");  // Fix I1: add showToast to catch path
+      showToast(errMsg, "error");
     } finally {
       unlistenProgress();
       unlistenDone();
@@ -88,21 +113,29 @@ export function InstallPanel() {
         <p className="text-[13px] text-text-secondary leading-[1.6]">
           {t("install.aboutDesc")}
         </p>
-        <div className="mt-3 px-3 py-2 bg-bg-window rounded-[8px] font-mono text-[12px] text-text-secondary">
+        <div className="mt-3 px-3 py-2 bg-bg-window rounded-[8px] font-mono text-[11px] text-text-secondary break-all">
           curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
         </div>
       </div>
 
-      {/* Progress card — only shown during/after install */}
+      {/* Progress card */}
       {(phase === "installing" || phase === "done" || phase === "error") && (
         <div className="bg-white rounded-[12px] p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)]">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[13px] font-[600] text-text-primary">
-              {t("install.progress")}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] font-[600] text-text-primary">
+                {t("install.progress")}
+              </span>
+              {phase === "installing" && elapsed > 0 && (
+                <span className="text-[11px] text-text-tertiary font-mono">
+                  {formatElapsed(elapsed)}
+                </span>
+              )}
+            </div>
             <Badge status={progressBadgeStatus}>{progressBadgeText}</Badge>
           </div>
-          {/* Gradient progress bar */}
+
+          {/* Progress bar */}
           <div className="h-[6px] bg-bg-secondary rounded-[3px] overflow-hidden mb-3">
             <div
               className={`h-full rounded-[3px] transition-all duration-300 ${
@@ -113,17 +146,25 @@ export function InstallPanel() {
               style={{ width: `${progress}%` }}
             />
           </div>
-          {/* Log scroll area */}
+
+          {/* Waiting hint shown only when no log lines yet */}
+          {phase === "installing" && logs.length === 0 && (
+            <p className="text-[12px] text-text-tertiary mb-2 animate-pulse">
+              {t("install.waiting")}
+            </p>
+          )}
+
+          {/* Log area */}
           <div
             ref={logRef}
-            className="max-h-[160px] overflow-y-auto space-y-[2px] font-mono text-[12px] text-text-secondary"
+            className="max-h-[180px] overflow-y-auto space-y-[2px] font-mono text-[12px] text-text-secondary"
             aria-live="polite"
           >
             {logs.map((l) => (
               <div key={l.id}>{l.line}</div>
             ))}
             {phase === "error" && (
-              <div className="text-status-red">❌ {errorMsg}</div>
+              <div className="text-status-red mt-1">❌ {errorMsg}</div>
             )}
           </div>
         </div>

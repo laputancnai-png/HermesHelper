@@ -31,8 +31,9 @@
   },
   "install": {
     "about": "关于安装",
-    "aboutDesc": "点击「开始安装」将通过官方安装脚本自动下载并安装 Hermes Agent。安装完成后请重启终端使 hermes 命令生效。",
+    "aboutDesc": "点击「开始安装」将通过官方脚本自动下载并安装 Hermes Agent，整个过程约需 3–10 分钟，取决于网络速度和依赖包下载进度。",
     "progress": "安装进度",
+    "waiting": "正在安装，请稍候……",
     "done": "完成",
     "failed": "失败",
     "start": "开始安装",
