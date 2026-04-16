@@ -17,18 +17,26 @@ export function GatewayPanel() {
   const [actionLoading, setActionLoading] = useState<"start" | "stop" | null>(
     null
   );
+  const [loaded, setLoaded] = useState(false);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let active = true;
 
     Commands.getGatewayConfig()
       .then((c) => {
-        if (active) setConfig(c);
+        if (active) {
+          setConfig(c);
+          setLoaded(true);
+        }
       })
       .catch(() => {
-        if (active) showToast(t("gateway.loadFailed"), "error");
+        if (active) {
+          showToast(t("gateway.loadFailed"), "error");
+          setLoaded(true);
+        }
       });
 
     Commands.getGatewayStatus()
@@ -57,6 +65,7 @@ export function GatewayPanel() {
   useEffect(() => {
     return () => {
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      if (startTimerRef.current) clearTimeout(startTimerRef.current);
     };
   }, []);
 
@@ -78,7 +87,7 @@ export function GatewayPanel() {
     try {
       await Commands.startGateway();
       // Wait 1.5s for hermes process to start before polling status
-      setTimeout(() => {
+      startTimerRef.current = setTimeout(() => {
         Commands.getGatewayStatus()
           .then((s) => {
             setStatus(s);
@@ -113,6 +122,14 @@ export function GatewayPanel() {
   const startDisabled =
     !config.botToken || actionLoading !== null || status.running;
   const stopDisabled = actionLoading !== null || !status.running;
+
+  if (!loaded) {
+    return (
+      <div className="flex items-center justify-center h-32 text-text-secondary text-[13px]">
+        {t("gateway.loading")}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
