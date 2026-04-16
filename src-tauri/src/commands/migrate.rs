@@ -131,7 +131,9 @@ fn add_dir_to_zip(
                 relative.to_string_lossy().replace('\\', "/")
             );
 
-            if path.is_file() {
+            if path.is_symlink() {
+                // skip symlinks to avoid traversal outside base_dir
+            } else if path.is_file() {
                 let content = std::fs::read(&path)
                     .map_err(|e| format!("Cannot read {}: {e}", path.display()))?;
                 zip.start_file(&zip_name, options)
