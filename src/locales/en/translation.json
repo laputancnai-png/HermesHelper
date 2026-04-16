@@ -120,6 +120,37 @@
     "hide":          "Hide",
     "loading":       "Loading..."
   },
+  "migrate": {
+    "section":        "IMPORT / EXPORT",
+    "exportTab":      "Export",
+    "importTab":      "Import",
+    "items": {
+      "config":   "Config Files",
+      "memory":   "Memory",
+      "skills":   "Skills Library",
+      "history":  "Session History",
+      "cron":     "Cron Jobs",
+      "hooks":    "Hooks"
+    },
+    "includeApiKeys": "Include API Keys (written in plaintext)",
+    "export":         "Export Backup",
+    "exporting":      "Exporting...",
+    "exportSuccess":  "Export successful",
+    "exportFailed":   "Export failed",
+    "selectFile":     "Select .zip file",
+    "previewing":     "Parsing...",
+    "conflictsFound": "{count} conflicting files found",
+    "noConflicts":    "No conflicts",
+    "selectAll":      "Select All",
+    "deselectAll":    "Deselect All",
+    "confirmImport":  "Confirm Import",
+    "importing":      "Importing...",
+    "importSuccess":  "{imported} imported, {skipped} skipped",
+    "importFailed":   "Import failed",
+    "importAgain":    "Import Again",
+    "invalidZip":     "Invalid backup file",
+    "hasConflict":    "(will overwrite)"
+  },
   "toast": {
     "configSaved": "Settings saved",
     "saveFailed": "Save failed: ",

@@ -56,6 +56,17 @@ export interface GatewayStatus {
   running: boolean;
 }
 
+export interface ImportFileInfo {
+  path: string;
+  category: string;
+  hasConflict: boolean;
+}
+
+export interface ImportSummary {
+  imported: number;
+  skipped: number;
+}
+
 // ── Commands ──────────────────────────────────────────────────
 
 export const Commands = {
@@ -112,6 +123,15 @@ export const Commands = {
 
   stopGateway: (): Promise<void> =>
     tauriInvoke("stop_gateway"),
+
+  exportData: (items: string[], includeApiKeys: boolean, savePath: string): Promise<void> =>
+    tauriInvoke("export_data", { items, includeApiKeys, savePath }),
+
+  previewImport: (zipPath: string): Promise<ImportFileInfo[]> =>
+    tauriInvoke("preview_import", { zipPath }),
+
+  executeImport: (zipPath: string, selectedFiles: string[]): Promise<ImportSummary> =>
+    tauriInvoke("execute_import", { zipPath, selectedFiles }),
 };
 
 // ── Events ────────────────────────────────────────────────────
