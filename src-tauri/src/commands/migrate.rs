@@ -148,6 +148,93 @@ fn add_dir_to_zip(
     Ok(())
 }
 
+// ── Import helpers ────────────────────────────────────────────────
+
+pub(crate) fn infer_category(zip_path: &str) -> String {
+    match zip_path.split('/').next().unwrap_or("") {
+        d @ ("memory" | "skills" | "history" | "cron" | "hooks") => d.to_string(),
+        _ => "config".to_string(),
+    }
+}
+
+pub(crate) fn preview_import_from(
+    zip_path: &Path,
+    hermes_base: &Path,
+) -> Result<Vec<ImportFileInfo>, String> {
+    let file =
+        std::fs::File::open(zip_path).map_err(|e| format!("Cannot open zip: {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("Invalid zip: {e}"))?;
+
+    let mut files = Vec::new();
+    for i in 0..archive.len() {
+        let entry = archive
+            .by_index(i)
+            .map_err(|e| format!("Zip read error: {e}"))?;
+        if entry.is_file() {
+            let name = entry.name().to_string();
+            let category = infer_category(&name);
+            let dest = hermes_base.join(&name);
+            let has_conflict = dest.exists();
+            files.push(ImportFileInfo {
+                path: name,
+                category,
+                has_conflict,
+            });
+        }
+    }
+    Ok(files)
+}
+
+pub(crate) fn execute_import_from(
+    zip_path: &Path,
+    selected_files: &[String],
+    hermes_base: &Path,
+) -> Result<ImportSummary, String> {
+    use std::collections::HashSet;
+    use std::io::Read as _;
+
+    let selected: HashSet<&str> = selected_files.iter().map(String::as_str).collect();
+
+    let file =
+        std::fs::File::open(zip_path).map_err(|e| format!("Cannot open zip: {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("Invalid zip: {e}"))?;
+
+    let mut imported = 0usize;
+    let mut skipped = 0usize;
+
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("Zip read error: {e}"))?;
+        if !entry.is_file() {
+            continue;
+        }
+        let name = entry.name().to_string();
+        if !selected.contains(name.as_str()) {
+            skipped += 1;
+            continue;
+        }
+        let dest = hermes_base.join(&name);
+        if let Some(parent) = dest.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Cannot create dir: {e}"))?;
+        }
+        let mut content = Vec::new();
+        entry
+            .read_to_end(&mut content)
+            .map_err(|e| format!("Cannot read entry: {e}"))?;
+        if std::fs::write(&dest, &content).is_ok() {
+            imported += 1;
+        } else {
+            skipped += 1;
+        }
+    }
+
+    Ok(ImportSummary { imported, skipped })
+}
+
 // ── Tauri commands ────────────────────────────────────────────────
 
 #[tauri::command]
@@ -159,6 +246,25 @@ pub async fn export_data(
     let hermes_base = hermes_dir()?;
     let path = std::path::Path::new(&save_path);
     export_data_to(&items, include_api_keys, path, &hermes_base)
+}
+
+#[tauri::command]
+pub async fn preview_import(zip_path: String) -> Result<Vec<ImportFileInfo>, String> {
+    let hermes_base = hermes_dir()?;
+    preview_import_from(std::path::Path::new(&zip_path), &hermes_base)
+}
+
+#[tauri::command]
+pub async fn execute_import(
+    zip_path: String,
+    selected_files: Vec<String>,
+) -> Result<ImportSummary, String> {
+    let hermes_base = hermes_dir()?;
+    execute_import_from(
+        std::path::Path::new(&zip_path),
+        &selected_files,
+        &hermes_base,
+    )
 }
 
 // ── Tests ─────────────────────────────────────────────────────────
@@ -253,5 +359,82 @@ mod tests {
         assert!(result.contains("BAZ=qux"));
         assert!(!result.contains("OPENAI_API_KEY"));
         assert!(!result.contains("TELEGRAM_BOT_TOKEN"));
+    }
+
+    #[test]
+    fn test_preview_import_marks_existing_files_as_conflict() {
+        let hermes = tempdir().unwrap();
+        // Pre-create config.toml in hermes dir
+        std::fs::write(hermes.path().join("config.toml"), b"existing").unwrap();
+
+        // Create a zip with config.toml and .env
+        let zip_dir = tempdir().unwrap();
+        let zip_path = zip_dir.path().join("backup.zip");
+        let file = std::fs::File::create(&zip_path).unwrap();
+        let mut writer = zip::ZipWriter::new(file);
+        let opts = zip::write::SimpleFileOptions::default();
+        writer.start_file("config.toml", opts).unwrap();
+        std::io::Write::write_all(&mut writer, b"new content").unwrap();
+        writer.start_file(".env", opts).unwrap();
+        std::io::Write::write_all(&mut writer, b"KEY=val").unwrap();
+        writer.finish().unwrap();
+
+        let files = preview_import_from(&zip_path, hermes.path()).unwrap();
+        assert_eq!(files.len(), 2);
+        let toml = files.iter().find(|f| f.path == "config.toml").unwrap();
+        let env = files.iter().find(|f| f.path == ".env").unwrap();
+        assert!(toml.has_conflict, "config.toml exists → conflict");
+        assert!(!env.has_conflict, ".env does not exist → no conflict");
+    }
+
+    #[test]
+    fn test_execute_import_only_writes_selected_files() {
+        let hermes = tempdir().unwrap();
+
+        // Build zip with two files
+        let zip_dir = tempdir().unwrap();
+        let zip_path = zip_dir.path().join("backup.zip");
+        let file = std::fs::File::create(&zip_path).unwrap();
+        let mut writer = zip::ZipWriter::new(file);
+        let opts = zip::write::SimpleFileOptions::default();
+        writer.start_file("config.toml", opts).unwrap();
+        std::io::Write::write_all(&mut writer, b"content_a").unwrap();
+        writer.start_file(".env", opts).unwrap();
+        std::io::Write::write_all(&mut writer, b"content_b").unwrap();
+        writer.finish().unwrap();
+
+        // Only select config.toml
+        let summary =
+            execute_import_from(&zip_path, &["config.toml".to_string()], hermes.path()).unwrap();
+
+        assert_eq!(summary.imported, 1);
+        assert_eq!(summary.skipped, 1);
+        assert!(hermes.path().join("config.toml").exists());
+        assert!(!hermes.path().join(".env").exists());
+    }
+
+    #[test]
+    fn test_execute_import_creates_parent_dirs() {
+        let hermes = tempdir().unwrap();
+
+        let zip_dir = tempdir().unwrap();
+        let zip_path = zip_dir.path().join("backup.zip");
+        let file = std::fs::File::create(&zip_path).unwrap();
+        let mut writer = zip::ZipWriter::new(file);
+        let opts = zip::write::SimpleFileOptions::default();
+        writer.start_file("memory/notes.md", opts).unwrap();
+        std::io::Write::write_all(&mut writer, b"hello").unwrap();
+        writer.finish().unwrap();
+
+        execute_import_from(
+            &zip_path,
+            &["memory/notes.md".to_string()],
+            hermes.path(),
+        )
+        .unwrap();
+
+        let dest = hermes.path().join("memory").join("notes.md");
+        assert!(dest.exists(), "memory/notes.md should be created");
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "hello");
     }
 }
