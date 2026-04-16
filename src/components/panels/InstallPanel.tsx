@@ -12,11 +12,26 @@ function formatElapsed(seconds: number): string {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
+/**
+ * Time-based fake progress: asymptotic curve that approaches 90% but never
+ * reaches it while still installing. Jumps to 100% only when truly done.
+ *
+ * Curve: 90 * (1 - e^(-t / 900))
+ *   30s  →  3%
+ *   2min →  12%
+ *   5min →  28%
+ *  10min →  48%
+ *  20min →  70%
+ *  30min →  82%
+ */
+function timeBasedProgress(elapsed: number): number {
+  return Math.round(90 * (1 - Math.exp(-elapsed / 900)));
+}
+
 export function InstallPanel() {
   const { t } = useTranslation();
   const { showToast } = useUIStore();
   const [phase, setPhase] = useState<Phase>("idle");
-  const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<Array<InstallProgress & { id: number }>>([]);
   const [errorMsg, setErrorMsg] = useState("");
   const [elapsed, setElapsed] = useState(0);
@@ -51,17 +66,14 @@ export function InstallPanel() {
     if (phase === "installing") return;
     setPhase("installing");
     setLogs([]);
-    setProgress(0);
     setErrorMsg("");
 
     const [unlistenProgress, unlistenDone, unlistenError] = await Promise.all([
       Events.onInstallProgress((p) => {
         setLogs((prev) => [...prev, { ...p, id: prev.length }]);
-        setProgress(p.pct);
       }),
       Events.onInstallDone(() => {
         setPhase("done");
-        setProgress(100);
         showToast(t("toast.installSuccess"), "success");
       }),
       Events.onInstallError((msg) => {
@@ -96,12 +108,17 @@ export function InstallPanel() {
     }
   }
 
-  const progressBadgeStatus: "green" | "red" | "accent" =
+  const visualPct =
+    phase === "done" ? 100 :
+    phase === "error" ? 0 :
+    phase === "installing" ? timeBasedProgress(elapsed) : 0;
+
+  const badgeStatus: "green" | "red" | "accent" =
     phase === "done" ? "green" : phase === "error" ? "red" : "accent";
-  const progressBadgeText =
+  const badgeText =
     phase === "done" ? t("install.done") :
     phase === "error" ? t("install.failed") :
-    `${progress}%`;
+    phase === "installing" ? formatElapsed(elapsed) : "";
 
   return (
     <div className="space-y-3 max-w-2xl">
@@ -122,32 +139,25 @@ export function InstallPanel() {
       {(phase === "installing" || phase === "done" || phase === "error") && (
         <div className="bg-white rounded-[12px] p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)]">
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[13px] font-[600] text-text-primary">
-                {t("install.progress")}
-              </span>
-              {phase === "installing" && elapsed > 0 && (
-                <span className="text-[11px] text-text-tertiary font-mono">
-                  {formatElapsed(elapsed)}
-                </span>
-              )}
-            </div>
-            <Badge status={progressBadgeStatus}>{progressBadgeText}</Badge>
+            <span className="text-[13px] font-[600] text-text-primary">
+              {t("install.progress")}
+            </span>
+            <Badge status={badgeStatus}>{badgeText}</Badge>
           </div>
 
-          {/* Progress bar */}
+          {/* Progress bar — time-based during install, solid on done/error */}
           <div className="h-[6px] bg-bg-secondary rounded-[3px] overflow-hidden mb-3">
             <div
-              className={`h-full rounded-[3px] transition-all duration-300 ${
+              className={`h-full rounded-[3px] transition-all duration-1000 ease-out ${
                 phase === "error"
                   ? "bg-status-red"
                   : "bg-gradient-to-r from-accent to-[#4ECDE4]"
               }`}
-              style={{ width: `${progress}%` }}
+              style={{ width: `${visualPct}%` }}
             />
           </div>
 
-          {/* Waiting hint shown only when no log lines yet */}
+          {/* Waiting hint when no log lines yet */}
           {phase === "installing" && logs.length === 0 && (
             <p className="text-[12px] text-text-tertiary mb-2 animate-pulse">
               {t("install.waiting")}

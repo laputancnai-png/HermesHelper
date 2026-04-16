@@ -150,21 +150,18 @@ pub async fn install_hermes(window: tauri::Window) -> Result<(), String> {
 
     let stdout = child.stdout.take().ok_or("no stdout")?;
     let mut reader = BufReader::new(stdout).lines();
-    let mut line_count: u8 = 8;
-
     while let Some(raw) = reader.next_line().await.map_err(|e| e.to_string())? {
         let line = strip_ansi(&raw);
         let line = line.trim();
         if line.is_empty() {
             continue;
         }
-        line_count = line_count.saturating_add(1).min(95);
         window
             .emit(
                 "install_progress",
                 InstallProgress {
                     line: line.to_string(),
-                    pct: line_count,
+                    pct: 0, // progress is time-based on the frontend
                 },
             )
             .map_err(|e| e.to_string())?;
