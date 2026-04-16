@@ -53,6 +53,8 @@ export function ToolsPanel() {
         }
       });
     return () => { active = false; };
+  // showToast and t are intentionally omitted: showToast is a stable Zustand selector
+  // reference, and t changes only on language switch (which should not re-fetch tools).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
