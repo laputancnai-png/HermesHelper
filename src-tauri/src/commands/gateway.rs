@@ -130,7 +130,7 @@ pub async fn get_gateway_status() -> GatewayStatus {
 
 #[tauri::command]
 pub async fn start_gateway() -> Result<(), String> {
-    std::process::Command::new("hermes")
+    tokio::process::Command::new("hermes")
         .args(["gateway", "run"])
         .spawn()
         .map_err(|e| format!("Failed to start gateway: {e}"))?;
@@ -159,7 +159,8 @@ pub async fn stop_gateway() -> Result<(), String> {
     // Fallback: send SIGTERM via PID file
     let pid_file = pid_path()?;
     if pid_file.exists() {
-        let content = std::fs::read_to_string(&pid_file)
+        let content = tokio::fs::read_to_string(&pid_file)
+            .await
             .map_err(|e| format!("Failed to read gateway.pid: {e}"))?;
         let pid_str = content.trim().to_string();
         std::process::Command::new("kill")
