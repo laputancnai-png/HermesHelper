@@ -11,4 +11,6 @@ const _fn3: () => Promise<GatewayStatus> = Commands.getGatewayStatus;
 const _fn4: () => Promise<void> = Commands.startGateway;
 const _fn5: () => Promise<void> = Commands.stopGateway;
 
+it("gateway types compile", () => {});
+
 export {};
