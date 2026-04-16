@@ -135,8 +135,14 @@ pub async fn install_hermes(window: tauri::Window) -> Result<(), String> {
     emit("安装脚本下载完成，开始安装（这可能需要几分钟）...", 8);
 
     // ── Step 2: run script, capturing merged stdout+stderr ─────────────
+    // CI=true  → most install scripts skip interactive prompts in CI environments
+    // stdin null → script gets EOF on any stdin read, preventing TTY hangs
+    let script_path = tmp.to_str().unwrap_or("/tmp/hermes_install.sh");
     let mut child = Command::new("bash")
-        .args(["-c", &format!("bash {} 2>&1", tmp.to_str().unwrap_or("/tmp/hermes_install.sh"))])
+        .args(["-c", &format!("bash {script_path} 2>&1")])
+        .env("CI", "true")
+        .env("HERMES_NON_INTERACTIVE", "1")
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
