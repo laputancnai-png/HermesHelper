@@ -98,6 +98,28 @@
     "tts":       { "label": "Text-to-Speech",       "desc": "Edge TTS free; paid providers need API Key" },
     "moa":       { "label": "Multi-Model Reasoning","desc": "Mixture of Agents, requires OPENROUTER_API_KEY" }
   },
+  "gateway": {
+    "section":       "TELEGRAM CONFIG",
+    "botToken":      "Bot Token",
+    "allowedUsers":  "Allowed User IDs (comma-separated)",
+    "saveConfig":    "Save Config",
+    "saved":         "Saved",
+    "saveFailed":    "Save failed",
+    "loadFailed":    "Failed to load config",
+    "statusSection": "Gateway Status",
+    "running":       "Running",
+    "stopped":       "Stopped",
+    "starting":      "Starting...",
+    "stopping":      "Stopping...",
+    "start":         "Start",
+    "stop":          "Stop",
+    "startFailed":   "Failed to start",
+    "stopFailed":    "Failed to stop",
+    "noTokenHint":   "Please save Bot Token first",
+    "show":          "Show",
+    "hide":          "Hide",
+    "loading":       "Loading..."
+  },
   "toast": {
     "configSaved": "Settings saved",
     "saveFailed": "Save failed: ",

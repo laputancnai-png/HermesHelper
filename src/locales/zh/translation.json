@@ -98,6 +98,28 @@
     "tts":       { "label": "语音合成",      "desc": "Edge TTS 免费；付费 provider 需 API Key" },
     "moa":       { "label": "多模型推理",    "desc": "Mixture of Agents，需要 OPENROUTER_API_KEY" }
   },
+  "gateway": {
+    "section":       "TELEGRAM 配置",
+    "botToken":      "Bot Token",
+    "allowedUsers":  "允许的用户 ID（逗号分隔）",
+    "saveConfig":    "保存配置",
+    "saved":         "已保存",
+    "saveFailed":    "保存失败",
+    "loadFailed":    "配置加载失败",
+    "statusSection": "网关状态",
+    "running":       "运行中",
+    "stopped":       "未运行",
+    "starting":      "启动中...",
+    "stopping":      "停止中...",
+    "start":         "启动",
+    "stop":          "停止",
+    "startFailed":   "启动失败",
+    "stopFailed":    "停止失败",
+    "noTokenHint":   "请先保存 Bot Token",
+    "show":          "显示",
+    "hide":          "隐藏",
+    "loading":       "加载中..."
+  },
   "toast": {
     "configSaved": "配置已保存",
     "saveFailed": "保存失败：",

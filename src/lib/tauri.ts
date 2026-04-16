@@ -47,6 +47,15 @@ export type ToolId =
   | "tts"
   | "moa";
 
+export interface GatewayConfig {
+  botToken: string;
+  allowedUsers: string;
+}
+
+export interface GatewayStatus {
+  running: boolean;
+}
+
 // ── Commands ──────────────────────────────────────────────────
 
 export const Commands = {
@@ -88,6 +97,21 @@ export const Commands = {
 
   saveTools: (toolsets: ToolId[]): Promise<void> =>
     tauriInvoke("save_tools", { toolsets }),
+
+  getGatewayConfig: (): Promise<GatewayConfig> =>
+    tauriInvoke("get_gateway_config"),
+
+  saveGatewayConfig: (botToken: string, allowedUsers: string): Promise<void> =>
+    tauriInvoke("save_gateway_config", { botToken, allowedUsers }),
+
+  getGatewayStatus: (): Promise<GatewayStatus> =>
+    tauriInvoke("get_gateway_status"),
+
+  startGateway: (): Promise<void> =>
+    tauriInvoke("start_gateway"),
+
+  stopGateway: (): Promise<void> =>
+    tauriInvoke("stop_gateway"),
 };
 
 // ── Events ────────────────────────────────────────────────────
