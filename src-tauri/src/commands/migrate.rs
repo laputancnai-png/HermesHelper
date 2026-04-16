@@ -20,6 +20,7 @@ pub struct ImportFileInfo {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ImportSummary {
     pub imported: usize,
     pub skipped: usize,
@@ -150,6 +151,16 @@ fn add_dir_to_zip(
 
 // ── Import helpers ────────────────────────────────────────────────
 
+/// Returns true only if `name` is a relative path with no `..` components.
+/// Rejects absolute paths (e.g. `/etc/passwd`) and path traversal (e.g. `../../evil`).
+fn is_safe_zip_path(name: &str) -> bool {
+    let p = std::path::Path::new(name);
+    !p.is_absolute()
+        && !p
+            .components()
+            .any(|c| c == std::path::Component::ParentDir)
+}
+
 pub(crate) fn infer_category(zip_path: &str) -> String {
     match zip_path.split('/').next().unwrap_or("") {
         d @ ("memory" | "skills" | "history" | "cron" | "hooks") => d.to_string(),
@@ -173,6 +184,9 @@ pub(crate) fn preview_import_from(
             .map_err(|e| format!("Zip read error: {e}"))?;
         if entry.is_file() {
             let name = entry.name().to_string();
+            if !is_safe_zip_path(&name) {
+                continue; // skip traversal entries silently
+            }
             let category = infer_category(&name);
             let dest = hermes_base.join(&name);
             let has_conflict = dest.exists();
@@ -212,6 +226,10 @@ pub(crate) fn execute_import_from(
             continue;
         }
         let name = entry.name().to_string();
+        if !is_safe_zip_path(&name) {
+            skipped += 1;
+            continue; // silently skip traversal entries
+        }
         if !selected.contains(name.as_str()) {
             skipped += 1;
             continue;
@@ -411,6 +429,33 @@ mod tests {
         assert_eq!(summary.skipped, 1);
         assert!(hermes.path().join("config.toml").exists());
         assert!(!hermes.path().join(".env").exists());
+    }
+
+    #[test]
+    fn test_execute_import_rejects_path_traversal() {
+        let hermes = tempdir().unwrap();
+
+        // Build zip with a traversal entry
+        let zip_dir = tempdir().unwrap();
+        let zip_path = zip_dir.path().join("evil.zip");
+        let file = std::fs::File::create(&zip_path).unwrap();
+        let mut writer = zip::ZipWriter::new(file);
+        let opts = zip::write::SimpleFileOptions::default();
+        writer.start_file("../../evil.txt", opts).unwrap();
+        std::io::Write::write_all(&mut writer, b"pwned").unwrap();
+        writer.finish().unwrap();
+
+        let summary = execute_import_from(
+            &zip_path,
+            &["../../evil.txt".to_string()],
+            hermes.path(),
+        )
+        .unwrap();
+
+        // traversal entry must be skipped, not written
+        assert_eq!(summary.imported, 0);
+        let evil = hermes.path().parent().unwrap().join("evil.txt");
+        assert!(!evil.exists(), "traversal path must not be written");
     }
 
     #[test]
