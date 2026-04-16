@@ -30,13 +30,8 @@
     "editConfig": "修改配置"
   },
   "install": {
-    "selectMode": "选择安装模式",
-    "mode": {
-      "full": { "label": "完整安装", "desc": "包含消息网关、Cron、CLI 工具，约 180 MB（推荐）" },
-      "core": { "label": "仅核心",   "desc": "最小安装，仅包含 CLI" },
-      "voice": { "label": "含 Voice", "desc": "完整安装 + 语音转录模块" }
-    },
-    "recommended": "推荐",
+    "about": "关于安装",
+    "aboutDesc": "点击「开始安装」将通过官方安装脚本自动下载并安装 Hermes Agent。安装完成后请重启终端使 hermes 命令生效。",
     "progress": "安装进度",
     "done": "完成",
     "failed": "失败",

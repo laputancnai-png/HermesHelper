@@ -31,8 +31,6 @@ export interface InstallProgress {
   pct: number;
 }
 
-export type InstallMode = "full" | "core" | "voice";
-
 export type ToolId =
   | "terminal"
   | "file"
@@ -76,8 +74,8 @@ export const Commands = {
   checkHermesVersion: (): Promise<string | null> =>
     tauriInvoke("check_hermes_version"),
 
-  installHermes: (mode: InstallMode): Promise<void> =>
-    tauriInvoke("install_hermes", { mode }),
+  installHermes: (): Promise<void> =>
+    tauriInvoke("install_hermes"),
 
   uninstallHermes: (): Promise<void> =>
     tauriInvoke("uninstall_hermes"),

@@ -5,27 +5,22 @@ import type { Panel } from "../../store";
 interface Segment {
   id: Panel;
   labelKey: string;
-  phase2?: boolean;
 }
 
 const SEGMENTS: Segment[] = [
   { id: "home",    labelKey: "nav.home" },
   { id: "install", labelKey: "nav.install" },
   { id: "config",  labelKey: "nav.config" },
-  { id: "tools",   labelKey: "nav.tools",   phase2: true },
-  { id: "gateway", labelKey: "nav.gateway", phase2: true },
-  { id: "migrate", labelKey: "nav.migrate", phase2: true },
+  { id: "tools",   labelKey: "nav.tools" },
+  { id: "gateway", labelKey: "nav.gateway" },
+  { id: "migrate", labelKey: "nav.migrate" },
 ];
 
 export function SegmentedControl() {
-  const { activePanel, setActivePanel, showToast } = useUIStore();
+  const { activePanel, setActivePanel } = useUIStore();
   const { t } = useTranslation();
 
   function handleClick(seg: Segment) {
-    if (seg.phase2) {
-      showToast(t("nav.phase2Coming"), "info");
-      return;
-    }
     setActivePanel(seg.id);
   }
 

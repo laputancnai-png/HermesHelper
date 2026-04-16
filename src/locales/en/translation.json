@@ -30,13 +30,8 @@
     "editConfig": "Edit Config"
   },
   "install": {
-    "selectMode": "Select Install Mode",
-    "mode": {
-      "full": { "label": "Full Install", "desc": "Includes gateway, Cron, CLI tools (~180 MB, recommended)" },
-      "core": { "label": "Core Only",    "desc": "Minimal install, CLI only" },
-      "voice": { "label": "With Voice",  "desc": "Full install + voice transcription module" }
-    },
-    "recommended": "Recommended",
+    "about": "About Installation",
+    "aboutDesc": "Click \"Start Install\" to download and install Hermes Agent via the official install script. Restart your terminal after installation for the hermes command to take effect.",
     "progress": "Install Progress",
     "done": "Done",
     "failed": "Failed",

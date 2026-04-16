@@ -1,22 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Commands, Events, InstallMode, InstallProgress } from "../../lib/tauri";
+import { Commands, Events, InstallProgress } from "../../lib/tauri";
 import { useUIStore } from "../../store";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
 
 type Phase = "idle" | "installing" | "done" | "error";
 
-const MODES: { id: InstallMode; labelKey: string; descKey: string }[] = [
-  { id: "full",  labelKey: "install.mode.full.label",  descKey: "install.mode.full.desc" },
-  { id: "core",  labelKey: "install.mode.core.label",  descKey: "install.mode.core.desc" },
-  { id: "voice", labelKey: "install.mode.voice.label", descKey: "install.mode.voice.desc" },
-];
-
 export function InstallPanel() {
   const { t } = useTranslation();
   const { showToast } = useUIStore();
-  const [selectedMode, setSelectedMode] = useState<InstallMode>("full");
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<Array<InstallProgress & { id: number }>>([]);
@@ -54,7 +47,7 @@ export function InstallPanel() {
     ]);
 
     try {
-      await Commands.installHermes(selectedMode);
+      await Commands.installHermes();
     } catch (e) {
       setPhase("error");
       const errMsg = e instanceof Error ? e.message : typeof e === "string" ? e : "Unknown error";
@@ -87,56 +80,16 @@ export function InstallPanel() {
 
   return (
     <div className="space-y-3 max-w-2xl">
-      {/* Mode selection card */}
+      {/* Info card */}
       <div className="bg-white rounded-[12px] p-4 shadow-[0_1px_4px_rgba(0,0,0,.06)]">
         <div className="text-[11px] text-text-tertiary font-[600] tracking-[.3px] uppercase mb-3">
-          {t("install.selectMode")}
+          {t("install.about")}
         </div>
-        <div className="space-y-2">
-          {MODES.map((m) => (
-            <label
-              key={m.id}
-              className={`flex items-start gap-3 p-3 rounded-[10px] border cursor-pointer transition-colors duration-150 ${
-                selectedMode === m.id
-                  ? "bg-accent-light border-accent border-[1.5px]"
-                  : "bg-white border-bg-secondary hover:bg-bg-window"
-              }`}
-            >
-              {/* Custom radio button */}
-              <div className="mt-[2px] flex-shrink-0">
-                <input
-                  type="radio"
-                  name="mode"
-                  value={m.id}
-                  checked={selectedMode === m.id}
-                  onChange={() => setSelectedMode(m.id)}
-                  className="sr-only"
-                />
-                <div
-                  className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                    selectedMode === m.id
-                      ? "border-accent bg-accent"
-                      : "border-bg-secondary bg-white"
-                  }`}
-                >
-                  {selectedMode === m.id && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                  )}
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-text-primary text-[13px] font-[500]">
-                    {t(m.labelKey)}
-                  </span>
-                  {m.id === "full" && (
-                    <Badge status="accent">{t("install.recommended")}</Badge>
-                  )}
-                </div>
-                <p className="text-text-secondary text-[11px] mt-[3px]">{t(m.descKey)}</p>
-              </div>
-            </label>
-          ))}
+        <p className="text-[13px] text-text-secondary leading-[1.6]">
+          {t("install.aboutDesc")}
+        </p>
+        <div className="mt-3 px-3 py-2 bg-bg-window rounded-[8px] font-mono text-[12px] text-text-secondary">
+          curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
         </div>
       </div>
 

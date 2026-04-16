@@ -12,30 +12,28 @@ beforeEach(() => {
 });
 
 describe("InstallPanel", () => {
-  it("renders mode selection heading", async () => {
+  it("renders about heading", async () => {
     render(<InstallPanel />);
-    expect(screen.getByText("install.selectMode")).toBeInTheDocument();
+    expect(screen.getByText("install.about")).toBeInTheDocument();
   });
 
-  it("shows install mode options", () => {
+  it("renders start install button", () => {
     render(<InstallPanel />);
-    expect(screen.getByText("install.mode.full.label")).toBeInTheDocument();
-    expect(screen.getByText("install.mode.core.label")).toBeInTheDocument();
-    expect(screen.getByText("install.mode.voice.label")).toBeInTheDocument();
+    expect(screen.getByText("install.start")).toBeInTheDocument();
   });
 
-  it("enables start button when mode selected", () => {
+  it("enables start button by default", () => {
     render(<InstallPanel />);
     const btn = screen.getByText("install.start");
     expect(btn).not.toBeDisabled();
   });
 
-  it("calls install_hermes on start", async () => {
+  it("calls install_hermes with no args on start", async () => {
     mockInvoke.mockResolvedValueOnce({ os: "macos", arch: "arm64", osVersion: "" });
     render(<InstallPanel />);
     fireEvent.click(screen.getByText("install.start"));
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("install_hermes", { mode: "full" });
+      expect(mockInvoke).toHaveBeenCalledWith("install_hermes");
     });
   });
 });

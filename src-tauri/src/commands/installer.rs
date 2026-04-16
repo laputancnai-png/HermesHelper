@@ -58,16 +58,15 @@ pub async fn check_hermes_version() -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
-pub async fn install_hermes(window: tauri::Window, mode: String) -> Result<(), String> {
-    let install_url = "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/install.sh";
+pub async fn install_hermes(window: tauri::Window) -> Result<(), String> {
+    let install_url =
+        "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh";
 
+    // Merge stderr into stdout (2>&1) so all installer output is captured.
     let mut child = Command::new("bash")
-        .args([
-            "-c",
-            &format!("curl -sSL {install_url} | bash -s -- --mode {mode}"),
-        ])
+        .args(["-c", &format!("curl -fsSL {install_url} | bash 2>&1")])
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|e| format!("Failed to start installer: {e}"))?;
 
