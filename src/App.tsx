@@ -5,6 +5,7 @@ import { HomePanel } from "./components/panels/HomePanel";
 import { InstallPanel } from "./components/panels/InstallPanel";
 import { ConfigPanel } from "./components/panels/ConfigPanel";
 import { ToolsPanel } from "./components/panels/ToolsPanel";
+import { GatewayPanel } from "./components/panels/GatewayPanel";
 import { useUIStore } from "./store";
 import { initI18n, i18n } from "./lib/i18n";
 import { Commands } from "./lib/tauri";
@@ -81,9 +82,8 @@ export default function App() {
           {activePanel === "install" && <InstallPanel />}
           {activePanel === "config"  && <ConfigPanel />}
           {activePanel === "tools" && <ToolsPanel />}
-          {(activePanel === "gateway" || activePanel === "migrate") && (
-            <PlaceholderPanel />
-          )}
+          {activePanel === "gateway" && <GatewayPanel />}
+          {activePanel === "migrate" && <PlaceholderPanel />}
         </div>
       </main>
 
