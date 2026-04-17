@@ -218,7 +218,7 @@ src/locales/
 3. 若系统语言以 `"zh"` 开头 → 使用中文，否则 → 使用英文
 4. `i18next` 初始化时设置 `lng`，后续语言切换调用 `i18n.changeLanguage()`
 
-### 新增 Rust 命令
+### 新增 Rust 命令（放在 `config.rs`）
 ```rust
 #[tauri::command]
 pub async fn get_system_locale() -> Result<String, String>
@@ -267,13 +267,13 @@ fn default_language() -> String { "system".into() }
 | `src/locales/zh/translation.json` | 新建 | 中文翻译 |
 | `src/locales/en/translation.json` | 新建 | 英文翻译 |
 | `src/lib/i18n.ts` | 新建 | i18next 初始化 |
-| `src-tauri/src/commands/process.rs` | 修改 | 新增 `get_system_locale` 命令 |
-| `src-tauri/src/lib.rs` | 修改 | 注册新命令 |
-| `src-tauri/src/commands/config.rs` | 修改 | `HermesConfig` 新增 `language` 字段 |
+| `src/lib/tauri.ts` | 修改 | `HermesConfig` 追加 `language: string`；`Commands` 追加 `getSystemLocale` |
+| `src-tauri/src/commands/config.rs` | 修改 | `HermesConfig` 新增 `language` 字段；新增 `get_system_locale` 命令 |
+| `src-tauri/src/lib.rs` | 修改 | 注册 `get_system_locale` 命令 |
 
 ### 不需要修改的文件
-- `src/lib/tauri.ts`（类型定义，追加 `language` 字段即可）
 - `src/store/`（Zustand store 逻辑不变）
+- `src-tauri/src/commands/process.rs`（doctor 模块不变）
 - `src-tauri/src/commands/installer.rs`（安装逻辑不变）
 - `.github/workflows/`（CI/CD 不变）
 - 所有测试文件（逻辑未变，只需更新文字 mock）

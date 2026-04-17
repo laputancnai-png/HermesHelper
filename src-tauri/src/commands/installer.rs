@@ -40,29 +40,31 @@ fn strip_ansi(s: &str) -> String {
 fn parse_version(output: &str) -> Option<String> {
     for line in output.lines() {
         let line = line.trim();
-        if let Some(rest) = line.strip_prefix("hermes ") {
-            let version = rest.split_whitespace().next()?;
-            return Some(version.to_string());
+        let lower = line.to_lowercase();
+        // Matches: "hermes 0.9.4", "Hermes Agent v0.10.0 ..."
+        if lower.starts_with("hermes") {
+            for token in line.split_whitespace() {
+                let t = token.trim_start_matches('v');
+                if t.contains('.') && t.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                    return Some(token.to_string());
+                }
+            }
         }
     }
     None
 }
 
-/// Try to find the hermes binary without relying on the GUI app's PATH.
-/// The install script puts it in ~/.local/bin/hermes on Linux/macOS.
-fn hermes_binary_path() -> Option<PathBuf> {
-    let home = dirs::home_dir()?;
+fn hermes_binary_path_for_home(home: &PathBuf) -> Option<PathBuf> {
     let candidates = [
         home.join(".local/bin/hermes"),
         home.join(".hermes/bin/hermes"),
     ];
-    for p in &candidates {
-        if p.exists() {
-            return Some(p.clone());
-        }
-    }
-    // Fall back to PATH lookup
-    None
+    candidates.into_iter().find(|p| p.exists())
+}
+
+/// Try to find the hermes binary without relying on the GUI app's PATH.
+fn hermes_binary_path() -> Option<PathBuf> {
+    hermes_binary_path_for_home(&dirs::home_dir()?)
 }
 
 #[tauri::command]
@@ -134,49 +136,90 @@ pub async fn install_hermes(window: tauri::Window) -> Result<(), String> {
 
     emit("安装脚本下载完成，开始安装（这可能需要几分钟）...", 8);
 
-    // ── Step 2: run script, capturing merged stdout+stderr ─────────────
-    // CI=true  → most install scripts skip interactive prompts in CI environments
-    // stdin null → script gets EOF on any stdin read, preventing TTY hangs
+    // ── Step 2: run script ────────────────────────────────────────────────
+    // The Hermes install script ends with an interactive setup wizard (using a
+    // TUI library that reads /dev/tty directly, so stdin tricks don't work).
+    // Strategy: stream output line-by-line; as soon as the hermes binary
+    // appears at ~/.local/bin/hermes, kill the script and declare success —
+    // the wizard is post-install config, the core install is already done.
     let script_path = tmp.to_str().unwrap_or("/tmp/hermes_install.sh");
     let mut child = Command::new("bash")
-        .args(["-c", &format!("bash {script_path} 2>&1")])
+        .args([script_path])
         .env("CI", "true")
         .env("HERMES_NON_INTERACTIVE", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to run installer: {e}"))?;
 
+    let binary_path = hermes_binary_path_for_home(
+        &dirs::home_dir().unwrap_or_default()
+    );
+
     let stdout = child.stdout.take().ok_or("no stdout")?;
-    let mut reader = BufReader::new(stdout).lines();
-    while let Some(raw) = reader.next_line().await.map_err(|e| e.to_string())? {
-        let line = strip_ansi(&raw);
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
+    let stderr = child.stderr.take().ok_or("no stderr")?;
+
+    // Merge stderr into stdout via a spawned task
+    let win2 = window.clone();
+    let stderr_task = tokio::spawn(async move {
+        let mut reader = BufReader::new(stderr).lines();
+        while let Ok(Some(raw)) = reader.next_line().await {
+            let line = strip_ansi(&raw);
+            let line = line.trim().to_string();
+            if !line.is_empty() {
+                win2.emit("install_progress", InstallProgress { line, pct: 0 }).ok();
+            }
         }
-        window
-            .emit(
-                "install_progress",
-                InstallProgress {
-                    line: line.to_string(),
-                    pct: 0, // progress is time-based on the frontend
-                },
-            )
-            .map_err(|e| e.to_string())?;
+    });
+
+    let mut reader = BufReader::new(stdout).lines();
+    let mut wizard_started = false;
+
+    loop {
+        // Check binary existence before blocking on next line
+        if binary_path.as_ref().map(|p| p.exists()).unwrap_or(false) {
+            emit("✅ Hermes 安装成功，正在关闭安装向导...", 0);
+            child.kill().await.ok();
+            break;
+        }
+
+        match reader.next_line().await {
+            Ok(Some(raw)) => {
+                let line = strip_ansi(&raw);
+                let line = line.trim().to_string();
+                if line.is_empty() { continue; }
+
+                // Detect wizard start — binary should be present shortly after
+                if line.contains("Setup Wizard") || line.contains("setup wizard") {
+                    wizard_started = true;
+                }
+
+                window.emit("install_progress", InstallProgress { line, pct: 0 })
+                    .map_err(|e| e.to_string())?;
+
+                // If wizard started and binary now exists, we're done
+                if wizard_started && binary_path.as_ref().map(|p| p.exists()).unwrap_or(false) {
+                    emit("✅ Hermes 安装成功，正在关闭安装向导...", 0);
+                    child.kill().await.ok();
+                    break;
+                }
+            }
+            Ok(None) => break, // EOF — script finished on its own
+            Err(e) => return Err(e.to_string()),
+        }
     }
 
-    let status = child.wait().await.map_err(|e| e.to_string())?;
-
-    // Clean up temp script
+    stderr_task.abort();
+    let _ = child.wait().await;
     let _ = std::fs::remove_file(&tmp);
 
-    if status.success() {
+    // Final check: did we actually get the binary?
+    if binary_path.as_ref().map(|p| p.exists()).unwrap_or(false) {
         window.emit("install_done", ()).map_err(|e| e.to_string())?;
         Ok(())
     } else {
-        let msg = "安装失败，请查看上方日志".to_string();
+        let msg = "安装失败，未找到 hermes 可执行文件".to_string();
         window.emit("install_error", &msg).map_err(|e| e.to_string())?;
         Err(msg)
     }
@@ -186,20 +229,24 @@ pub async fn install_hermes(window: tauri::Window) -> Result<(), String> {
 pub async fn uninstall_hermes() -> Result<(), String> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
 
+    // Use `rm -rf` for reliable removal (handles symlinks, special files, etc.)
     let hermes_dir = home.join(".hermes");
-    if hermes_dir.exists() {
-        std::fs::remove_dir_all(&hermes_dir)
-            .map_err(|e| format!("Failed to remove ~/.hermes: {e}"))?;
+    if hermes_dir.exists() || hermes_dir.symlink_metadata().is_ok() {
+        let status = Command::new("rm")
+            .args(["-rf", hermes_dir.to_str().unwrap_or("")])
+            .status()
+            .await
+            .map_err(|e| format!("Failed to run rm: {e}"))?;
+        if !status.success() {
+            return Err("Failed to remove ~/.hermes directory".into());
+        }
     }
 
-    for bin_path in [
-        home.join(".local/bin/hermes"),
-        home.join(".hermes/bin/hermes"),
-    ] {
-        if bin_path.exists() {
-            std::fs::remove_file(&bin_path)
-                .map_err(|e| format!("Failed to remove binary: {e}"))?;
-        }
+    // Remove binary symlink/file
+    let bin_path = home.join(".local/bin/hermes");
+    if bin_path.exists() || bin_path.symlink_metadata().is_ok() {
+        std::fs::remove_file(&bin_path)
+            .map_err(|e| format!("Failed to remove binary: {e}"))?;
     }
 
     Ok(())
@@ -214,6 +261,13 @@ mod tests {
         let output = "hermes 0.9.4\nsome other line";
         let version = parse_version(output);
         assert_eq!(version, Some("0.9.4".to_string()));
+    }
+
+    #[test]
+    fn test_parse_version_hermes_agent_format() {
+        let output = "Hermes Agent v0.10.0 (2026.4.16)\nProject: /Users/foo/.hermes/hermes-agent";
+        let version = parse_version(output);
+        assert_eq!(version, Some("v0.10.0".to_string()));
     }
 
     #[test]

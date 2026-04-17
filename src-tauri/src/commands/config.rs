@@ -66,8 +66,61 @@ impl HermesConfig {
         }
         let content = std::fs::read_to_string(path)
             .map_err(|e| format!("Failed to read config: {e}"))?;
-        serde_yaml::from_str(&content)
-            .map_err(|e| format!("Failed to parse config: {e}"))
+
+        // Parse as raw Value to tolerate nested structures we don't own
+        let raw: serde_yaml::Value = serde_yaml::from_str(&content)
+            .map_err(|e| format!("Failed to parse config YAML: {e}"))?;
+
+        let mut cfg = Self::default();
+
+        // model can be a plain string OR a map like { default: "...", provider: "..." }
+        match raw.get("model") {
+            Some(serde_yaml::Value::String(s)) => cfg.model = s.clone(),
+            Some(serde_yaml::Value::Mapping(m)) => {
+                if let Some(serde_yaml::Value::String(s)) =
+                    m.get("default").or_else(|| m.get("model"))
+                {
+                    cfg.model = s.clone();
+                }
+                // provider inside model map takes priority if present
+                if let Some(serde_yaml::Value::String(p)) = m.get("provider") {
+                    if p != "auto" {
+                        cfg.provider = p.clone();
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        // Top-level provider (overrides model.provider if set)
+        if let Some(serde_yaml::Value::String(s)) = raw.get("provider") {
+            cfg.provider = s.clone();
+        }
+
+        // Flat boolean / numeric fields
+        if let Some(v) = raw.get("persistent_memory").or_else(|| raw.get("persistentMemory")) {
+            if let Some(b) = v.as_bool() { cfg.persistent_memory = b; }
+        }
+        if let Some(v) = raw.get("auto_skill_generation").or_else(|| raw.get("autoSkillGeneration")) {
+            if let Some(b) = v.as_bool() { cfg.auto_skill_generation = b; }
+        }
+        if let Some(v) = raw.get("command_approval").or_else(|| raw.get("commandApproval")) {
+            if let Some(b) = v.as_bool() { cfg.command_approval = b; }
+        }
+        if let Some(v) = raw.get("budget_warning").or_else(|| raw.get("budgetWarning")) {
+            if let Some(b) = v.as_bool() { cfg.budget_warning = b; }
+        }
+        if let Some(v) = raw.get("memory_limit_mb").or_else(|| raw.get("memoryLimitMb")) {
+            if let Some(n) = v.as_u64() { cfg.memory_limit_mb = n as u32; }
+        }
+        if let Some(serde_yaml::Value::String(s)) = raw.get("backend") {
+            cfg.backend = s.clone();
+        }
+        if let Some(serde_yaml::Value::String(s)) = raw.get("language") {
+            cfg.language = s.clone();
+        }
+
+        Ok(cfg)
     }
 
     pub fn save_to(&self, path: &Path) -> Result<(), String> {
@@ -141,6 +194,38 @@ pub async fn get_system_locale() -> Result<String, String> {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn test_load_nested_model_map() {
+        // Simulates the real Hermes config.yaml structure
+        let yaml = r#"
+model:
+  default: "anthropic/claude-opus-4.6"
+  provider: "auto"
+  temperature: 0.7
+"#;
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("config.yaml");
+        std::fs::write(&path, yaml).unwrap();
+        let cfg = HermesConfig::load_from(&path).unwrap();
+        assert_eq!(cfg.model, "anthropic/claude-opus-4.6");
+        // provider stays default when hermes uses "auto"
+        assert_eq!(cfg.provider, "openrouter");
+    }
+
+    #[test]
+    fn test_load_string_model() {
+        let yaml = r#"
+model: "openai/gpt-4o"
+provider: "openai"
+"#;
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("config.yaml");
+        std::fs::write(&path, yaml).unwrap();
+        let cfg = HermesConfig::load_from(&path).unwrap();
+        assert_eq!(cfg.model, "openai/gpt-4o");
+        assert_eq!(cfg.provider, "openai");
+    }
 
     #[test]
     fn test_default_config_roundtrip() {
