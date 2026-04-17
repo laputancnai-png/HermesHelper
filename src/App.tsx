@@ -1,86 +1,108 @@
-import { useEffect } from "react";
-import { SegmentedControl } from "./components/layout/SegmentedControl";
-import { Toast } from "./components/ui/Toast";
-import { HomePanel } from "./components/panels/HomePanel";
-import { InstallPanel } from "./components/panels/InstallPanel";
-import { ConfigPanel } from "./components/panels/ConfigPanel";
-import { ToolsPanel } from "./components/panels/ToolsPanel";
-import { GatewayPanel } from "./components/panels/GatewayPanel";
-import { MigratePanel } from "./components/panels/MigratePanel";
-import { useUIStore } from "./store";
-import { initI18n, i18n } from "./lib/i18n";
-import { Commands } from "./lib/tauri";
-import { useTranslation } from "react-i18next";
+// src/App.tsx
+import { LangProvider, useLang } from "./i18n";
+import { useStore } from "./store";
+import { theme as P } from "./theme";
+import { HermesStatusPanel } from "./features/status/HermesStatusPanel";
+import { InstallPanel } from "./features/install/InstallPanel";
+import { ModelPanel } from "./features/model/ModelPanel";
+import { MigratePanel } from "./features/migrate/MigratePanel";
 
-initI18n();
+const LANGS = [
+  { code: "zh" as const, label: "中文", flag: "🇨🇳" },
+  { code: "en" as const, label: "EN",   flag: "🇺🇸" },
+];
 
-function LangToggle() {
-  const { i18n: i18nInst } = useTranslation();
-  const currentLang = i18nInst.language?.startsWith("zh") ? "zh" : "en";
-  function toggle() {
-    i18nInst.changeLanguage(currentLang === "zh" ? "en" : "zh");
-  }
+function LangPicker() {
+  const { lang, setLang } = useLang();
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      className="text-[12px] font-[600] text-text-secondary hover:text-text-primary px-2 py-1 rounded-[6px] hover:bg-black/[0.06] transition-colors duration-150 select-none"
-    >
-      {currentLang === "zh" ? "EN" : "中文"}
-    </button>
+    <div style={{ display: "flex", gap: 4 }}>
+      {LANGS.map(l => (
+        <button
+          key={l.code}
+          onClick={() => setLang(l.code)}
+          style={{
+            background: lang === l.code ? P.indigo : "transparent",
+            color: lang === l.code ? "#fff" : P.soft,
+            border: "none", borderRadius: 8,
+            padding: "4px 10px", fontSize: 12, fontWeight: 700,
+            cursor: "pointer", transition: "all 0.15s",
+            display: "flex", alignItems: "center", gap: 4,
+          }}
+        >
+          <span>{l.flag}</span>
+          <span>{l.label}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
-export default function App() {
-  const { activePanel } = useUIStore();
-
-  useEffect(() => {
-    async function applyLanguage() {
-      try {
-        const cfg = await Commands.getConfig();
-        const lang = cfg.language ?? "system";
-        if (lang === "system") {
-          const locale = await Commands.getSystemLocale();
-          await i18n.changeLanguage(locale.startsWith("zh") ? "zh" : "en");
-        } else {
-          await i18n.changeLanguage(lang);
-        }
-      } catch {
-        // keep default zh on error
-      }
-    }
-    applyLanguage();
-  }, []);
-
+function Toast() {
+  const { toast, clearToast } = useStore();
+  if (!toast) return null;
+  const colors = {
+    success: { bg: P.banner.success.bg, border: P.banner.success.border, text: P.banner.success.text },
+    error:   { bg: P.banner.error.bg,   border: P.banner.error.border,   text: P.banner.error.text   },
+    info:    { bg: "#EEF0FF", border: P.indigo, text: P.indigo },
+  }[toast.type];
   return (
     <div
-      className="flex flex-col h-screen bg-bg-window overflow-hidden"
-      style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" }}
+      className="pop"
+      onClick={clearToast}
+      style={{
+        position: "fixed", bottom: 24, right: 24, zIndex: 9999,
+        background: colors.bg, border: `2px solid ${colors.border}`,
+        color: colors.text, borderRadius: P.radius.md,
+        padding: "12px 20px", fontSize: 13, fontWeight: 700,
+        boxShadow: P.shadow.heavy, cursor: "pointer", maxWidth: 360,
+      }}
     >
-      {/* Header: segmented control centered, lang toggle on right */}
-      <div
-        className="flex items-center justify-center flex-shrink-0 bg-[rgba(246,246,246,.95)] border-b border-bg-secondary px-4 py-3 relative"
-        style={{ backdropFilter: "blur(20px)" }}
-      >
-        <SegmentedControl />
-        <div className="absolute right-4">
-          <LangToggle />
+      {toast.message}
+    </div>
+  );
+}
+
+function AppInner() {
+  const { t } = useLang();
+
+  return (
+    <div style={{ minHeight: "100vh", background: P.bg, fontFamily: "Nunito,sans-serif" }}>
+      {/* Sticky Navbar */}
+      <div style={{
+        position: "sticky", top: 0, zIndex: 100,
+        height: P.nav.height,
+        background: P.nav.bg,
+        borderBottom: `1.5px solid ${P.nav.border}`,
+        display: "flex", alignItems: "center",
+        padding: "0 24px",
+        boxShadow: "0 2px 8px rgba(91,95,239,0.06)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+          <span style={{ fontSize: 26 }}>🤖</span>
+          <span style={{ fontFamily: "Fredoka One,cursive", fontSize: 18, color: P.ink }}>
+            {t.app.brand}
+          </span>
         </div>
+        <LangPicker />
       </div>
 
-      {/* Content centered, wider max-width */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-6 py-6">
-          {activePanel === "home"    && <HomePanel />}
-          {activePanel === "install" && <InstallPanel />}
-          {activePanel === "config"  && <ConfigPanel />}
-          {activePanel === "tools" && <ToolsPanel />}
-          {activePanel === "gateway" && <GatewayPanel />}
-          {activePanel === "migrate" && <MigratePanel />}
-        </div>
+      {/* Main content */}
+      <main style={{ maxWidth: 880, margin: "28px auto 0", padding: "0 20px 40px" }}>
+        <HermesStatusPanel />
+        <InstallPanel />
+        <ModelPanel />
+        <MigratePanel />
       </main>
 
       <Toast />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <LangProvider>
+      <AppInner />
+    </LangProvider>
   );
 }
