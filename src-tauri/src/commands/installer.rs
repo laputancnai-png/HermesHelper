@@ -196,6 +196,15 @@ pub async fn install_hermes(window: tauri::Window) -> Result<(), String> {
 
     // Final check: did we actually get the binary?
     if binary_exists() {
+        // Auto-start gateway in background (detached — survives app exit)
+        let bin = if bin1.exists() { &bin1 } else { &bin2 };
+        let _ = std::process::Command::new(bin)
+            .args(["gateway", "run"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+
         window.emit("install_done", ()).map_err(|e| e.to_string())?;
         Ok(())
     } else {

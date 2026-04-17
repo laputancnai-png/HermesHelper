@@ -18,7 +18,7 @@ function formatElapsed(s: number) {
 
 export function InstallPanel() {
   const { t } = useLang();
-  const { installed, showToast } = useStore();
+  const { installed, showToast, setStatus } = useStore();
   const [phase, setPhase] = useState<Phase>("idle");
   const [logs, setLogs] = useState<Array<InstallProgress & { id: number }>>([]);
   const [errorMsg, setErrorMsg] = useState("");
@@ -42,6 +42,13 @@ export function InstallPanel() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [phase]);
 
+  async function refreshStatus() {
+    try {
+      const s = await Commands.getHermesStatus();
+      setStatus(s.installed, s.version, s.running);
+    } catch {}
+  }
+
   async function handleInstall() {
     if (phase === "installing") return;
     setPhase("installing");
@@ -50,7 +57,13 @@ export function InstallPanel() {
 
     const [unProg, unDone, unErr] = await Promise.all([
       Events.onInstallProgress(p => setLogs(prev => [...prev, { ...p, id: prev.length }])),
-      Events.onInstallDone(() => { setPhase("done"); showToast(t.toast.installSuccess, "success"); }),
+      Events.onInstallDone(() => {
+        setPhase("done");
+        showToast(t.toast.installSuccess, "success");
+        // Force status refresh: gateway may take a moment to start
+        setTimeout(refreshStatus, 1500);
+        setTimeout(refreshStatus, 4000);
+      }),
       Events.onInstallError(msg => { setPhase("error"); setErrorMsg(msg); showToast(msg, "error"); }),
     ]);
 
@@ -72,12 +85,15 @@ export function InstallPanel() {
       await Commands.uninstallHermes();
       showToast(t.toast.uninstallSuccess, "success");
       setShowUninstallOpts(false);
+      setTimeout(refreshStatus, 500);
     } catch (e) {
       showToast(`${t.toast.uninstallFailed}: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
   }
 
   const visualPct = phase === "done" ? 100 : phase === "error" ? 0 : phase === "installing" ? timeBasedProgress(elapsed) : 0;
+  // Show log only while installing or on error
+  const showLog = phase === "installing" || phase === "error";
 
   return (
     <div style={{
@@ -121,7 +137,7 @@ export function InstallPanel() {
         </div>
       )}
 
-      {/* Progress bar */}
+      {/* Progress bar — shown during install or when done/error */}
       {phase !== "idle" && (
         <>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
@@ -130,7 +146,7 @@ export function InstallPanel() {
               {phase === "done" ? t.install.done : phase === "error" ? t.install.failed : formatElapsed(elapsed)}
             </span>
           </div>
-          <div style={{ height: 6, background: "#EBEBF8", borderRadius: 3, overflow: "hidden", marginBottom: 10 }}>
+          <div style={{ height: 6, background: "#EBEBF8", borderRadius: 3, overflow: "hidden", marginBottom: showLog ? 10 : 0 }}>
             <div style={{
               height: "100%", borderRadius: 3,
               width: `${visualPct}%`,
@@ -141,8 +157,8 @@ export function InstallPanel() {
         </>
       )}
 
-      {/* Log area */}
-      {(phase === "installing" || logs.length > 0) && (
+      {/* Log area — only while installing or on error */}
+      {showLog && (
         <div style={{
           background: "#1E1E2E", borderRadius: 12, overflow: "hidden",
           maxHeight: 240, display: "flex", flexDirection: "column",
