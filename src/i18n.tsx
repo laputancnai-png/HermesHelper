@@ -100,8 +100,10 @@ type Lang = keyof typeof TRANSLATIONS;
 
 const LS_KEY = "hermes-manager.lang.v1";
 function detectLang(): Lang {
-  const saved = localStorage.getItem(LS_KEY);
-  if (saved === "zh" || saved === "en") return saved;
+  try {
+    const saved = localStorage.getItem(LS_KEY);
+    if (saved === "zh" || saved === "en") return saved;
+  } catch {}
   return navigator.language.startsWith("zh") ? "zh" : "en";
 }
 
@@ -117,7 +119,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(detectLang);
   function setLang(l: Lang) {
     setLangState(l);
-    localStorage.setItem(LS_KEY, l);
+    try { localStorage.setItem(LS_KEY, l); } catch {}
   }
   return <Ctx.Provider value={{ lang, setLang, t: TRANSLATIONS[lang] }}>{children}</Ctx.Provider>;
 }
