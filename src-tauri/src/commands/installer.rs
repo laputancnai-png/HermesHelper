@@ -137,14 +137,11 @@ pub async fn install_hermes(window: tauri::Window) -> Result<(), String> {
     emit("安装脚本下载完成，开始安装（这可能需要几分钟）...", 8);
 
     // ── Step 2: run script ────────────────────────────────────────────────
-    // The Hermes install script ends with an interactive setup wizard (using a
-    // TUI library that reads /dev/tty directly, so stdin tricks don't work).
-    // Strategy: stream output line-by-line; as soon as the hermes binary
-    // appears at ~/.local/bin/hermes, kill the script and declare success —
-    // the wizard is post-install config, the core install is already done.
+    // Pass --skip-setup to bypass the interactive setup wizard entirely.
+    // The script natively supports this flag (sets RUN_SETUP=false).
     let script_path = tmp.to_str().unwrap_or("/tmp/hermes_install.sh");
     let mut child = Command::new("bash")
-        .args([script_path])
+        .args([script_path, "--skip-setup"])
         .env("CI", "true")
         .env("HERMES_NON_INTERACTIVE", "1")
         .stdin(Stdio::null())
@@ -153,9 +150,12 @@ pub async fn install_hermes(window: tauri::Window) -> Result<(), String> {
         .spawn()
         .map_err(|e| format!("Failed to run installer: {e}"))?;
 
-    let binary_path = hermes_binary_path_for_home(
-        &dirs::home_dir().unwrap_or_default()
-    );
+    // Check all candidate paths on every iteration (not just a pre-computed one),
+    // so detection works for both fresh installs and reinstalls.
+    let home = dirs::home_dir().unwrap_or_default();
+    let bin1 = home.join(".local/bin/hermes");
+    let bin2 = home.join(".hermes/bin/hermes");
+    let binary_exists = || bin1.exists() || bin2.exists();
 
     let stdout = child.stdout.take().ok_or("no stdout")?;
     let stderr = child.stderr.take().ok_or("no stderr")?;
@@ -174,38 +174,18 @@ pub async fn install_hermes(window: tauri::Window) -> Result<(), String> {
     });
 
     let mut reader = BufReader::new(stdout).lines();
-    let mut wizard_started = false;
 
     loop {
-        // Check binary existence before blocking on next line
-        if binary_path.as_ref().map(|p| p.exists()).unwrap_or(false) {
-            emit("✅ Hermes 安装成功，正在关闭安装向导...", 0);
-            child.kill().await.ok();
-            break;
-        }
-
         match reader.next_line().await {
             Ok(Some(raw)) => {
                 let line = strip_ansi(&raw);
                 let line = line.trim().to_string();
                 if line.is_empty() { continue; }
 
-                // Detect wizard start — binary should be present shortly after
-                if line.contains("Setup Wizard") || line.contains("setup wizard") {
-                    wizard_started = true;
-                }
-
-                window.emit("install_progress", InstallProgress { line, pct: 0 })
+                window.emit("install_progress", InstallProgress { line: line.clone(), pct: 0 })
                     .map_err(|e| e.to_string())?;
-
-                // If wizard started and binary now exists, we're done
-                if wizard_started && binary_path.as_ref().map(|p| p.exists()).unwrap_or(false) {
-                    emit("✅ Hermes 安装成功，正在关闭安装向导...", 0);
-                    child.kill().await.ok();
-                    break;
-                }
             }
-            Ok(None) => break, // EOF — script finished on its own
+            Ok(None) => break, // EOF — script finished on its own (--skip-setup exits normally)
             Err(e) => return Err(e.to_string()),
         }
     }
@@ -215,7 +195,7 @@ pub async fn install_hermes(window: tauri::Window) -> Result<(), String> {
     let _ = std::fs::remove_file(&tmp);
 
     // Final check: did we actually get the binary?
-    if binary_path.as_ref().map(|p| p.exists()).unwrap_or(false) {
+    if binary_exists() {
         window.emit("install_done", ()).map_err(|e| e.to_string())?;
         Ok(())
     } else {
