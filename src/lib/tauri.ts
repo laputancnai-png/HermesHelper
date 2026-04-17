@@ -45,6 +45,12 @@ export type ToolId =
   | "tts"
   | "moa";
 
+export interface HermesStatus {
+  installed: boolean;
+  version: string | null;
+  running: boolean;
+}
+
 export interface GatewayConfig {
   botToken: string;
   allowedUsers: string;
@@ -68,6 +74,9 @@ export interface ImportSummary {
 // ── Commands ──────────────────────────────────────────────────
 
 export const Commands = {
+  getHermesStatus: (): Promise<HermesStatus> =>
+    tauriInvoke("get_hermes_status"),
+
   detectPlatform: (): Promise<PlatformInfo> =>
     tauriInvoke("detect_platform"),
 

@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{config, gateway, installer, migrate, process, tools};
+use commands::{config, gateway, installer, migrate, process, status, tools};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -68,6 +68,7 @@ pub fn run() {
             migrate::export_data,
             migrate::preview_import,
             migrate::execute_import,
+            status::get_hermes_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
