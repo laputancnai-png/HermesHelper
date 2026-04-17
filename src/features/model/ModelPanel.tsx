@@ -6,20 +6,48 @@ import { Commands } from "../../lib/tauri";
 import { useStore } from "../../store";
 import { useLang } from "../../i18n";
 
+// Providers from Hermes config.yaml — values must match exactly
 const PROVIDERS = [
-  { value: "openrouter", label: "OpenRouter" },
-  { value: "anthropic",  label: "Anthropic" },
-  { value: "openai",     label: "OpenAI" },
-  { value: "google",     label: "Google" },
-  { value: "nous",       label: "Nous Portal" },
+  { value: "auto",         label: "Auto（自动检测）" },
+  { value: "openrouter",   label: "OpenRouter" },
+  { value: "anthropic",    label: "Anthropic" },
+  { value: "gemini",       label: "Google Gemini" },
+  { value: "nous",         label: "Nous Portal（OAuth）" },
+  { value: "nous-api",     label: "Nous Portal（API Key）" },
+  { value: "openai-codex", label: "OpenAI Codex" },
+  { value: "copilot",      label: "GitHub Copilot" },
+  { value: "zai",          label: "z.ai / ZhipuAI GLM" },
+  { value: "kimi-coding",  label: "Kimi / Moonshot AI" },
+  { value: "minimax",      label: "MiniMax（Global）" },
+  { value: "minimax-cn",   label: "MiniMax（中国）" },
+  { value: "huggingface",  label: "Hugging Face" },
+  { value: "xiaomi",       label: "小米 MiMo" },
+  { value: "arcee",        label: "Arcee AI" },
+  { value: "ollama-cloud", label: "Ollama Cloud" },
+  { value: "kilocode",     label: "KiloCode" },
+  { value: "ai-gateway",   label: "Vercel AI Gateway" },
+  { value: "ollama",       label: "Ollama（本地）" },
+  { value: "lmstudio",     label: "LM Studio（本地）" },
+  { value: "custom",       label: "Custom OpenAI-compatible" },
 ];
 
-const MODELS: Record<string, string[]> = {
-  openrouter: ["anthropic/claude-sonnet-4-5", "anthropic/claude-opus-4", "openai/gpt-4o", "google/gemini-2.5-pro"],
-  anthropic:  ["claude-sonnet-4-5", "claude-opus-4", "claude-haiku-4-5"],
-  openai:     ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
-  google:     ["gemini-2.5-pro", "gemini-2.5-flash"],
-  nous:       ["hermes-3-70b", "hermes-3-405b"],
+// Common model suggestions per provider (user can also type any model freely)
+const MODEL_SUGGESTIONS: Record<string, string[]> = {
+  auto:         ["anthropic/claude-opus-4.6", "anthropic/claude-sonnet-4-5", "openai/gpt-4o"],
+  openrouter:   ["anthropic/claude-opus-4.6", "anthropic/claude-sonnet-4-5", "openai/gpt-4o", "google/gemini-2.5-pro", "google/gemini-2.5-flash"],
+  anthropic:    ["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"],
+  gemini:       ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
+  nous:         ["hermes-3-70b", "hermes-3-405b"],
+  "nous-api":   ["hermes-3-70b", "hermes-3-405b"],
+  "openai-codex": ["codex-mini-latest", "o4-mini"],
+  copilot:      ["gpt-4o", "claude-sonnet-4-5", "gemini-2.5-pro"],
+  zai:          ["glm-4-plus", "glm-z1-air"],
+  "kimi-coding": ["kimi-k2-0711-preview", "moonshot-v1-8k"],
+  minimax:      ["MiniMax-Text-01", "abab6.5s-chat"],
+  "minimax-cn": ["MiniMax-Text-01"],
+  ollama:       ["llama3.3", "qwen2.5-coder:32b", "deepseek-r1:32b"],
+  lmstudio:     ["local-model"],
+  custom:       [],
 };
 
 const INPUT: React.CSSProperties = {
@@ -65,7 +93,7 @@ export function ModelPanel() {
     }).catch(() => {});
   }, [setConfig]);
 
-  const modelList = MODELS[local.provider] ?? MODELS["openrouter"];
+  const modelSuggestions = MODEL_SUGGESTIONS[local.provider] ?? [];
 
   async function handleSave() {
     setSaving(true);
@@ -113,7 +141,7 @@ export function ModelPanel() {
           <label style={LABEL}>{t.model.provider}</label>
           <select
             value={local.provider}
-            onChange={e => setLocal(prev => ({ ...prev, provider: e.target.value, model: MODELS[e.target.value]?.[0] ?? "" }))}
+            onChange={e => setLocal(prev => ({ ...prev, provider: e.target.value, model: MODEL_SUGGESTIONS[e.target.value]?.[0] ?? "" }))}
             style={INPUT}
           >
             {PROVIDERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
@@ -122,15 +150,16 @@ export function ModelPanel() {
 
         <div>
           <label style={LABEL}>{t.model.model}</label>
-          <select
+          <input
+            list="model-suggestions"
             value={local.model}
             onChange={e => setLocal(prev => ({ ...prev, model: e.target.value }))}
+            placeholder="anthropic/claude-opus-4.6"
             style={INPUT}
-          >
-            {(modelList.includes(local.model) ? modelList : [local.model, ...modelList]).map(m => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+          />
+          <datalist id="model-suggestions">
+            {modelSuggestions.map(m => <option key={m} value={m} />)}
+          </datalist>
         </div>
       </div>
 
