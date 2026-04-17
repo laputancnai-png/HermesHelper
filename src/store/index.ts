@@ -1,42 +1,63 @@
+// src/store/index.ts
 import { create } from "zustand";
-import { useShallow } from "zustand/shallow";
-import { createHermesSlice, HermesSlice } from "./hermesSlice";
-import { createConfigSlice, ConfigSlice } from "./configSlice";
-import { createUISlice, UISlice } from "./uiSlice";
 
-export type { Panel } from "./uiSlice";
+export interface HermesConfig {
+  provider: string;
+  model: string;
+  memoryLimitMb: number;
+  persistentMemory: boolean;
+  autoSkillGeneration: boolean;
+  commandApproval: boolean;
+  budgetWarning: boolean;
+  language: string;
+}
 
-type Store = HermesSlice & ConfigSlice & UISlice;
+export interface Toast {
+  message: string;
+  type: "success" | "error" | "info";
+}
 
-export const useStore = create<Store>()((set) => ({
-  ...createHermesSlice(set as Parameters<typeof createHermesSlice>[0]),
-  ...createConfigSlice(set as Parameters<typeof createConfigSlice>[0]),
-  ...createUISlice(set as Parameters<typeof createUISlice>[0]),
+interface Store {
+  // Status
+  installed: boolean;
+  version: string | null;
+  running: boolean;
+  setStatus: (installed: boolean, version: string | null, running: boolean) => void;
+
+  // Config
+  config: HermesConfig;
+  setConfig: (c: HermesConfig) => void;
+
+  // Toast
+  toast: Toast | null;
+  showToast: (message: string, type?: Toast["type"]) => void;
+  clearToast: () => void;
+}
+
+const DEFAULT_CONFIG: HermesConfig = {
+  provider: "openrouter",
+  model: "anthropic/claude-sonnet-4-5",
+  memoryLimitMb: 5120,
+  persistentMemory: true,
+  autoSkillGeneration: true,
+  commandApproval: false,
+  budgetWarning: true,
+  language: "system",
+};
+
+export const useStore = create<Store>((set) => ({
+  installed: false,
+  version: null,
+  running: false,
+  setStatus: (installed, version, running) => set({ installed, version, running }),
+
+  config: DEFAULT_CONFIG,
+  setConfig: (config) => set({ config }),
+
+  toast: null,
+  showToast: (message, type = "info") => {
+    set({ toast: { message, type } });
+    setTimeout(() => set({ toast: null }), 3500);
+  },
+  clearToast: () => set({ toast: null }),
 }));
-
-// Convenience selectors — useShallow prevents new-object-reference re-renders
-export const useHermesStore = () => useStore(useShallow((s) => ({
-  isInstalled: s.isInstalled,
-  version: s.version,
-  doctorResults: s.doctorResults,
-  doctorRunning: s.doctorRunning,
-  setInstalled: s.setInstalled,
-  setDoctorResults: s.setDoctorResults,
-  setDoctorRunning: s.setDoctorRunning,
-})));
-
-export const useConfigStore = () => useStore(useShallow((s) => ({
-  config: s.config,
-  configLoaded: s.configLoaded,
-  setConfig: s.setConfig,
-  updateConfig: s.updateConfig,
-  setConfigLoaded: s.setConfigLoaded,
-})));
-
-export const useUIStore = () => useStore(useShallow((s) => ({
-  activePanel: s.activePanel,
-  toast: s.toast,
-  setActivePanel: s.setActivePanel,
-  showToast: s.showToast,
-  clearToast: s.clearToast,
-})));
