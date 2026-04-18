@@ -1,5 +1,5 @@
 // src/features/dashboard/DashboardPage.tsx
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { theme as P } from "../../theme";
 import { Btn } from "../../components/shared";
 import { useLang } from "../../i18n";
@@ -10,15 +10,41 @@ const POLL_INTERVAL_MS = 500;
 const POLL_MAX_ATTEMPTS = 30; // 15 seconds
 
 export function DashboardPage() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [ready, setReady] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Send language preference to dashboard via postMessage (multiple formats)
+  const syncLanguage = useCallback(() => {
+    const cw = iframeRef.current?.contentWindow;
+    if (!cw) return;
+    const locale = lang === "zh" ? "zh-CN" : "en";
+    [
+      { type: "setLanguage", language: locale },
+      { type: "locale", value: locale },
+      { type: "i18n", lang: locale },
+      { lang: locale },
+    ].forEach(msg => cw.postMessage(msg, DASHBOARD_URL));
+  }, [lang]);
+
+  // Re-sync whenever lang changes (after iframe is loaded)
+  useEffect(() => {
+    if (iframeLoaded) syncLanguage();
+  }, [lang, iframeLoaded, syncLanguage]);
+
+  const handleIframeLoad = useCallback(() => {
+    setIframeLoaded(true);
+    syncLanguage();
+  }, [syncLanguage]);
 
   const startPolling = useCallback(() => {
     setReady(false);
     setTimedOut(false);
     setAttempts(0);
+    setIframeLoaded(false);
   }, []);
 
   useEffect(() => {
@@ -50,7 +76,9 @@ export function DashboardPage() {
     return (
       <div style={{ width: "100%", height: "100%", overflow: "hidden" }}>
         <iframe
+          ref={iframeRef}
           src={DASHBOARD_URL}
+          onLoad={handleIframeLoad}
           style={{ width: "100%", height: "100%", border: "none", display: "block" }}
           title="Hermes Dashboard"
         />
