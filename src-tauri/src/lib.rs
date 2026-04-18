@@ -46,9 +46,14 @@ pub fn run() {
                 .build(app)?;
 
             // Start Hermes dashboard in background (no browser open)
-            let _ = std::process::Command::new("hermes")
+            if let Err(e) = std::process::Command::new("hermes")
                 .args(["dashboard", "--no-open"])
-                .spawn();
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+            {
+                eprintln!("[hermes-manager] dashboard spawn failed: {e}");
+            }
 
             Ok(())
         })
