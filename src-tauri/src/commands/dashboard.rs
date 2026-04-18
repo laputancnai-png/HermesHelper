@@ -33,8 +33,14 @@ pub async fn show_dashboard(
 
     let main_win = app.get_window("main").ok_or("no main window")?;
     let locale = if lang == "zh" { "zh" } else { "en" };
+    // Set locale before React boots; also hide Hermes' own header so only content shows.
     let init_script = format!(
-        "localStorage.setItem('hermes-locale','{}');",
+        "localStorage.setItem('hermes-locale','{}');\
+         document.addEventListener('DOMContentLoaded',function(){{\
+           var s=document.createElement('style');\
+           s.textContent='header{{display:none!important}}';\
+           document.head.appendChild(s);\
+         }});",
         locale
     );
 
