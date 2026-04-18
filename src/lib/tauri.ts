@@ -153,6 +153,18 @@ export const Commands = {
 
   checkDashboardReady: (): Promise<boolean> =>
     tauriInvoke("check_dashboard_ready"),
+
+  showDashboard: (lang: string, x: number, y: number, width: number, height: number): Promise<void> =>
+    tauriInvoke("show_dashboard", { lang, x, y, width, height }),
+
+  hideDashboard: (): Promise<void> =>
+    tauriInvoke("hide_dashboard"),
+
+  setDashboardLanguage: (lang: string): Promise<void> =>
+    tauriInvoke("set_dashboard_language", { lang }),
+
+  resizeDashboard: (x: number, y: number, width: number, height: number): Promise<void> =>
+    tauriInvoke("resize_dashboard", { x, y, width, height }),
 };
 
 // ── Events ────────────────────────────────────────────────────

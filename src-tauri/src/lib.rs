@@ -1,6 +1,7 @@
 mod commands;
 
 use commands::{chat, config, dashboard, gateway, installer, migrate, process, status, tools};
+use commands::dashboard::DashboardWebview;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -57,9 +58,14 @@ pub fn run() {
 
             Ok(())
         })
+        .manage(DashboardWebview(std::sync::Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             chat::hermes_chat,
             dashboard::check_dashboard_ready,
+            dashboard::show_dashboard,
+            dashboard::hide_dashboard,
+            dashboard::set_dashboard_language,
+            dashboard::resize_dashboard,
             installer::detect_platform,
             installer::check_hermes_version,
             installer::install_hermes,

@@ -5,51 +5,31 @@ import { Btn } from "../../components/shared";
 import { useLang } from "../../i18n";
 import { Commands } from "../../lib/tauri";
 
-const DASHBOARD_URL = "http://127.0.0.1:9119";
 const POLL_INTERVAL_MS = 500;
-const POLL_MAX_ATTEMPTS = 30; // 15 seconds
+const POLL_MAX_ATTEMPTS = 30;
+const NAV_H = P.nav.height; // 56
+
+function getBounds() {
+  return { x: 0, y: NAV_H, width: window.innerWidth, height: window.innerHeight - NAV_H };
+}
 
 export function DashboardPage() {
   const { t, lang } = useLang();
   const [ready, setReady] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [attempts, setAttempts] = useState(0);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  // Send language preference to dashboard via postMessage (multiple formats)
-  const syncLanguage = useCallback(() => {
-    const cw = iframeRef.current?.contentWindow;
-    if (!cw) return;
-    const locale = lang === "zh" ? "zh-CN" : "en";
-    [
-      { type: "setLanguage", language: locale },
-      { type: "locale", value: locale },
-      { type: "i18n", lang: locale },
-      { lang: locale },
-    ].forEach(msg => cw.postMessage(msg, DASHBOARD_URL));
-  }, [lang]);
-
-  // Re-sync whenever lang changes (after iframe is loaded)
-  useEffect(() => {
-    if (iframeLoaded) syncLanguage();
-  }, [lang, iframeLoaded, syncLanguage]);
-
-  const handleIframeLoad = useCallback(() => {
-    setIframeLoaded(true);
-    syncLanguage();
-  }, [syncLanguage]);
+  const shownRef = useRef(false);
 
   const startPolling = useCallback(() => {
     setReady(false);
     setTimedOut(false);
     setAttempts(0);
-    setIframeLoaded(false);
+    shownRef.current = false;
   }, []);
 
+  // Polling loop
   useEffect(() => {
     if (ready || timedOut) return;
-
     let cancelled = false;
     let attempt = 0;
 
@@ -72,18 +52,35 @@ export function DashboardPage() {
     return () => { cancelled = true; };
   }, [ready, timedOut]);
 
+  // Show child webview once ready
+  useEffect(() => {
+    if (!ready) return;
+    const { x, y, width, height } = getBounds();
+    shownRef.current = true;
+    void Commands.showDashboard(lang, x, y, width, height);
+    return () => { void Commands.hideDashboard(); };
+  }, [ready]);
+
+  // Sync language changes after webview is shown
+  useEffect(() => {
+    if (!ready || !shownRef.current) return;
+    void Commands.setDashboardLanguage(lang);
+  }, [lang, ready]);
+
+  // Resize listener
+  useEffect(() => {
+    if (!ready) return;
+    const onResize = () => {
+      const { x, y, width, height } = getBounds();
+      void Commands.resizeDashboard(x, y, width, height);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [ready]);
+
   if (ready) {
-    return (
-      <div style={{ width: "100%", height: "100%", overflow: "hidden" }}>
-        <iframe
-          ref={iframeRef}
-          src={DASHBOARD_URL}
-          onLoad={handleIframeLoad}
-          style={{ width: "100%", height: "100%", border: "none", display: "block" }}
-          title="Hermes Dashboard"
-        />
-      </div>
-    );
+    // Child webview is shown natively — render invisible placeholder
+    return <div style={{ width: "100%", height: "100%" }} />;
   }
 
   return (
