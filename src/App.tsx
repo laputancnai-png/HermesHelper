@@ -69,29 +69,6 @@ function AppInner() {
   const { t } = useLang();
   const [page, setPage] = useState<"manage" | "chat" | "dashboard">("manage");
 
-  // Full-screen dashboard — no navbar, just a floating back pill
-  if (page === "dashboard") {
-    return (
-      <div style={{ minHeight: "100vh", background: "#000", fontFamily: "Nunito,sans-serif" }}>
-        <div
-          onClick={() => setPage("manage")}
-          style={{
-            position: "fixed", top: 10, left: 10, zIndex: 9999,
-            background: "rgba(99,102,241,0.88)", borderRadius: 20,
-            padding: "5px 14px", fontSize: 12, fontWeight: 700,
-            color: "#fff", cursor: "pointer", backdropFilter: "blur(8px)",
-            boxShadow: "0 2px 12px rgba(0,0,0,0.35)",
-            display: "flex", alignItems: "center", gap: 5,
-          }}
-        >
-          ← {t.nav.manage}
-        </div>
-        <DashboardPage />
-        <Toast />
-      </div>
-    );
-  }
-
   const NAV_TABS = [
     { id: "manage"    as const, label: t.nav.manage,    emoji: "🤖" },
     { id: "chat"      as const, label: t.nav.chat,      emoji: ""   },
@@ -154,18 +131,29 @@ function AppInner() {
         <LangPicker />
       </div>
 
+      {/* Dashboard — full-screen below nav */}
+      {page === "dashboard" && (
+        <div style={{
+          position: "fixed", top: P.nav.height, left: 0, right: 0, bottom: 0, zIndex: 10,
+        }}>
+          <DashboardPage />
+        </div>
+      )}
+
       {/* Main content */}
-      <main style={{ maxWidth: 880, margin: "28px auto 0", padding: "0 20px 40px" }}>
-        {page === "manage" && (
-          <>
-            <HermesStatusPanel />
-            <InstallPanel />
-            <ModelPanel />
-            <MigratePanel />
-          </>
-        )}
-        {page === "chat" && <ChatPage />}
-      </main>
+      {page !== "dashboard" && (
+        <main style={{ maxWidth: 880, margin: "28px auto 0", padding: "0 20px 40px" }}>
+          {page === "manage" && (
+            <>
+              <HermesStatusPanel />
+              <InstallPanel />
+              <ModelPanel />
+              <MigratePanel />
+            </>
+          )}
+          {page === "chat" && <ChatPage />}
+        </main>
+      )}
 
       <Toast />
     </div>
