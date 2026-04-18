@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{chat, config, gateway, installer, migrate, process, status, tools};
+use commands::{chat, config, dashboard, gateway, installer, migrate, process, status, tools};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -44,10 +44,17 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Start Hermes dashboard in background (no browser open)
+            let _ = std::process::Command::new("hermes")
+                .args(["dashboard", "--no-open"])
+                .spawn();
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             chat::hermes_chat,
+            dashboard::check_dashboard_ready,
             installer::detect_platform,
             installer::check_hermes_version,
             installer::install_hermes,
