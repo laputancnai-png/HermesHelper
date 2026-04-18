@@ -31,7 +31,8 @@ export function DashboardPage() {
       while (!cancelled && attempt < POLL_MAX_ATTEMPTS) {
         attempt += 1;
         setAttempts(attempt);
-        const ok = await Commands.checkDashboardReady();
+        let ok = false;
+        try { ok = await Commands.checkDashboardReady(); } catch { /* not ready */ }
         if (ok) {
           if (!cancelled) setReady(true);
           return;
