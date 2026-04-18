@@ -8,6 +8,7 @@ import { InstallPanel } from "./features/install/InstallPanel";
 import { ModelPanel } from "./features/model/ModelPanel";
 import { MigratePanel } from "./features/migrate/MigratePanel";
 import { ChatPage } from "./features/chat/ChatPage";
+import { DashboardPage } from "./features/dashboard/DashboardPage";
 
 const LANGS = [
   { code: "zh" as const, label: "中文", flag: "🇨🇳" },
@@ -66,11 +67,12 @@ function Toast() {
 
 function AppInner() {
   const { t } = useLang();
-  const [page, setPage] = useState<"manage" | "chat">("manage");
+  const [page, setPage] = useState<"manage" | "chat" | "dashboard">("manage");
 
   const NAV_TABS = [
-    { id: "manage" as const, label: t.nav.manage, emoji: "🤖" },
-    { id: "chat"   as const, label: t.nav.chat,   emoji: "" },
+    { id: "manage"    as const, label: t.nav.manage,    emoji: "🤖" },
+    { id: "chat"      as const, label: t.nav.chat,      emoji: ""   },
+    { id: "dashboard" as const, label: t.nav.dashboard, emoji: ""   },
   ];
 
   return (
@@ -140,6 +142,7 @@ function AppInner() {
           </>
         )}
         {page === "chat" && <ChatPage />}
+        {page === "dashboard" && <DashboardPage />}
       </main>
 
       <Toast />

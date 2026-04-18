@@ -3,7 +3,7 @@ import { createContext, useContext, useState, ReactNode } from "react";
 
 const ZH = {
   app: { brand: "Hermes Manager", tagline: "Hermes AI 助手管理器" },
-  nav: { lang: "语言", manage: "管理", chat: "💬 聊天" },
+  nav: { lang: "语言", manage: "管理", chat: "💬 聊天", dashboard: "📊 Dashboard" },
   status: {
     installed: "已安装", notInstalled: "未安装",
     running: "运行中", stopped: "已停止",
@@ -59,11 +59,18 @@ const ZH = {
     error: "发送失败",
     cleared: "已开始新对话",
   },
+  dashboard: {
+    loading: "正在启动 Dashboard...",
+    loadingHint: "Hermes Dashboard 正在初始化",
+    timeout: "Dashboard 启动超时",
+    timeoutHint: "请检查 Hermes 是否已正确安装",
+    retry: "重试",
+  },
 };
 
 const EN: typeof ZH = {
   app: { brand: "Hermes Manager", tagline: "Hermes AI Agent Manager" },
-  nav: { lang: "Language", manage: "Manage", chat: "💬 Chat" },
+  nav: { lang: "Language", manage: "Manage", chat: "💬 Chat", dashboard: "📊 Dashboard" },
   status: {
     installed: "Installed", notInstalled: "Not Installed",
     running: "Running", stopped: "Stopped",
@@ -118,6 +125,13 @@ const EN: typeof ZH = {
     empty: "Send a message to start chatting with Hermes",
     error: "Send failed",
     cleared: "New conversation started",
+  },
+  dashboard: {
+    loading: "Starting Dashboard...",
+    loadingHint: "Hermes Dashboard is initializing",
+    timeout: "Dashboard timed out",
+    timeoutHint: "Please check that Hermes is installed correctly",
+    retry: "Retry",
   },
 };
 
