@@ -7,10 +7,9 @@ import { Commands } from "../../lib/tauri";
 
 const POLL_INTERVAL_MS = 500;
 const POLL_MAX_ATTEMPTS = 30;
-const NAV_H = P.nav.height; // 56
 
 function getBounds() {
-  return { x: 0, y: NAV_H, width: window.innerWidth, height: window.innerHeight - NAV_H };
+  return { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
 }
 
 export function DashboardPage() {
