@@ -5,14 +5,12 @@ import { Btn } from "../../components/shared";
 import { useLang } from "../../i18n";
 import { Commands } from "../../lib/tauri";
 
-const DASHBOARD_POLL_URL = "http://127.0.0.1:9119";
-const DASHBOARD_PROXY_BASE = "hermes-ui://local";
+const DASHBOARD_URL = "http://127.0.0.1:9119";
 const POLL_INTERVAL_MS = 500;
 const POLL_MAX_ATTEMPTS = 30; // 15 seconds
 
 export function DashboardPage() {
-  const { t, lang } = useLang();
-  const dashboardSrc = `${DASHBOARD_PROXY_BASE}/?__hm_lang=${lang === "zh" ? "zh-CN" : "en"}`;
+  const { t } = useLang();
   const [ready, setReady] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [attempts, setAttempts] = useState(0);
@@ -52,7 +50,7 @@ export function DashboardPage() {
     return (
       <div style={{ width: "100%", height: "100%", overflow: "hidden" }}>
         <iframe
-          src={dashboardSrc}
+          src={DASHBOARD_URL}
           style={{ width: "100%", height: "100%", border: "none", display: "block" }}
           title="Hermes Dashboard"
         />

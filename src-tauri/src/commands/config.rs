@@ -13,6 +13,10 @@ fn env_path() -> PathBuf {
     hermes_dir().join(".env")
 }
 
+fn zshrc_path() -> PathBuf {
+    dirs::home_dir().unwrap_or_default().join(".zshrc")
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct HermesConfig {
@@ -128,11 +132,129 @@ impl HermesConfig {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("Failed to create config dir: {e}"))?;
         }
-        let content = serde_yaml::to_string(self)
-            .map_err(|e| format!("Failed to serialize config: {e}"))?;
-        std::fs::write(path, content)
+
+        let content = if path.exists() {
+            std::fs::read_to_string(path)
+                .map_err(|e| format!("Failed to read config: {e}"))?
+        } else {
+            String::new()
+        };
+
+        let updated = patch_model_fields(&content, &self.provider, &self.model);
+        std::fs::write(path, updated)
             .map_err(|e| format!("Failed to write config: {e}"))
     }
+}
+
+// ── Text-based model field patcher ───────────────────────────
+//
+// Operates on raw YAML text so that comments, blank lines, and every
+// other section are completely untouched.  Only the `provider:` and
+// `default:` lines inside the *last* top-level `model:` block are
+// updated (or inserted if absent).  No YAML parse-serialize cycle.
+
+fn yaml_indent(line: &str) -> &str {
+    let n = line.len() - line.trim_start_matches(|c: char| c == ' ' || c == '\t').len();
+    &line[..n]
+}
+
+fn escape_yaml_string(s: &str) -> String {
+    s.replace('"', "\\\"")
+}
+
+fn is_top_level_model_key(line: &str) -> bool {
+    if line.starts_with(' ') || line.starts_with('\t') {
+        return false;
+    }
+    let trimmed = line.trim();
+    if trimmed.is_empty() || trimmed.starts_with('#') {
+        return false;
+    }
+    let (key, _) = match trimmed.split_once(':') {
+        Some(parts) => parts,
+        None => return false,
+    };
+    key.trim() == "model"
+}
+
+fn tighten_env_permissions(path: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let permissions = std::fs::Permissions::from_mode(0o600);
+        std::fs::set_permissions(path, permissions)
+            .map_err(|e| format!("Failed to set .env permissions: {e}"))?;
+    }
+    Ok(())
+}
+
+fn patch_model_fields(content: &str, provider: &str, model: &str) -> String {
+    let mut lines: Vec<String> = content.lines().map(String::from).collect();
+    let n = lines.len();
+    let trailing_newline = content.ends_with('\n');
+
+    // Find the *last* top-level `model:` line (unindented, not a comment)
+    let mut model_idx: Option<usize> = None;
+    for (i, line) in lines.iter().enumerate() {
+        if is_top_level_model_key(line) {
+            model_idx = Some(i);
+        }
+    }
+
+    let model_idx = match model_idx {
+        Some(idx) => idx,
+        None => {
+            // No model: block — append a minimal one
+            lines.push("model:".into());
+            lines.push(format!("  provider: {}", provider));
+            lines.push(format!("  default: \"{}\"", escape_yaml_string(model)));
+            let mut out = lines.join("\n");
+            if trailing_newline { out.push('\n'); }
+            return out;
+        }
+    };
+
+    // Scan forward through the block (indented lines + blank lines until a
+    // non-indented, non-blank line that isn't a top-level comment).
+    let mut found_provider = false;
+    let mut found_default  = false;
+    let mut i = model_idx + 1;
+    while i < n {
+        let line = &lines[i];
+        let is_indented = line.starts_with(' ') || line.starts_with('\t');
+        let is_blank    = line.trim().is_empty();
+
+        if !is_indented && !is_blank {
+            break; // left the block
+        }
+
+        if is_indented {
+            let trimmed = line.trim();
+            if !trimmed.starts_with('#') {
+                if trimmed.starts_with("provider:") {
+                    lines[i] = format!("{}provider: {}", yaml_indent(line), provider);
+                    found_provider = true;
+                } else if trimmed.starts_with("default:") || trimmed.starts_with("model:") {
+                    lines[i] = format!("{}default: \"{}\"", yaml_indent(line), escape_yaml_string(model));
+                    found_default = true;
+                }
+            }
+        }
+        i += 1;
+    }
+
+    // Insert any missing fields right after the `model:` line
+    let insert_at = model_idx + 1;
+    if !found_default {
+        lines.insert(insert_at, format!("  default: \"{}\"", escape_yaml_string(model)));
+    }
+    if !found_provider {
+        lines.insert(insert_at, format!("  provider: {}", provider));
+    }
+
+    let mut out = lines.join("\n");
+    if trailing_newline { out.push('\n'); }
+    out
 }
 
 // ── Tauri commands ────────────────────────────────────────────
@@ -147,27 +269,271 @@ pub async fn save_config(config: HermesConfig) -> Result<(), String> {
     config.save_to(&config_path())
 }
 
+fn env_key_for_provider(provider: &str) -> &'static str {
+    match provider.trim().to_lowercase().as_str() {
+        "nvidia" => "NVIDIA_API_KEY",
+        "openrouter" => "OPENROUTER_API_KEY",
+        "openai" => "OPENAI_API_KEY",
+        "anthropic" => "ANTHROPIC_API_KEY",
+        "google" | "gemini" => "GEMINI_API_KEY",
+        _ => "LLM_API_KEY",
+    }
+}
+
+fn env_line_key(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() || trimmed.starts_with('#') {
+        return None;
+    }
+    let (left, _) = trimmed.split_once('=')?;
+    Some(left.trim().to_string())
+}
+
+fn ensure_nvidia_shell_block() -> Result<(), String> {
+    let zshrc = zshrc_path();
+    let existing = std::fs::read_to_string(&zshrc).unwrap_or_default();
+    let begin = "# >>> hermeshelper nvidia runtime >>>";
+    let end = "# <<< hermeshelper nvidia runtime <<<";
+
+    if existing.contains(begin) && existing.contains(end) {
+        return Ok(());
+    }
+
+    let block = [
+        begin,
+        "# Keep Hermes NVIDIA /model validation stable in interactive shells.",
+        "if [[ -f \"/etc/ssl/cert.pem\" ]]; then",
+        "  export SSL_CERT_FILE=\"/etc/ssl/cert.pem\"",
+        "fi",
+        "if [[ -f \"$HOME/.hermes/.env\" ]]; then",
+        "  _hermes_nvidia_key=\"$(grep '^NVIDIA_API_KEY=' \"$HOME/.hermes/.env\" | head -1 | cut -d= -f2-)\"",
+        "  if [[ -n \"$_hermes_nvidia_key\" ]]; then",
+        "    export NVIDIA_API_KEY=\"$_hermes_nvidia_key\"",
+        "  fi",
+        "  unset _hermes_nvidia_key",
+        "fi",
+        end,
+    ]
+    .join("\n");
+
+    let mut next = existing;
+    if !next.is_empty() && !next.ends_with('\n') {
+        next.push('\n');
+    }
+    if !next.is_empty() {
+        next.push('\n');
+    }
+    next.push_str(&block);
+    next.push('\n');
+
+    std::fs::write(&zshrc, next).map_err(|e| format!("Failed to update ~/.zshrc: {e}"))
+}
+
 #[tauri::command]
-pub async fn save_api_key(key: String) -> Result<(), String> {
+pub async fn save_api_key(provider: String, key: String) -> Result<(), String> {
+    let trimmed_key = key.trim();
+    if trimmed_key.is_empty() {
+        return Err("API key is empty".into());
+    }
+    if trimmed_key.contains('\n') || trimmed_key.contains('\r') || trimmed_key.contains('\0') {
+        return Err("API key contains invalid characters".into());
+    }
+
+    let target_key = env_key_for_provider(&provider);
     let path = env_path();
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create .hermes dir: {e}"))?;
     }
+
     let existing = std::fs::read_to_string(&path).unwrap_or_default();
     let mut lines: Vec<String> = existing
         .lines()
-        .filter(|l| !l.starts_with("LLM_API_KEY="))
+        .filter(|line| {
+            match env_line_key(line) {
+                Some(current) => {
+                    let normalized = current.to_uppercase();
+                    normalized != target_key
+                }
+                None => true,
+            }
+        })
         .map(String::from)
         .collect();
-    lines.push(format!("LLM_API_KEY={key}"));
+    lines.push(format!("{}={}", target_key, trimmed_key));
     std::fs::write(&path, lines.join("\n") + "\n")
-        .map_err(|e| format!("Failed to write .env: {e}"))
+        .map_err(|e| format!("Failed to write .env: {e}"))?;
+    tighten_env_permissions(&path)?;
+
+    if provider.trim().eq_ignore_ascii_case("nvidia") {
+        ensure_nvidia_shell_block()?;
+    }
+
+    Ok(())
+}
+
+/// Patch a single key:value inside the last top-level `model:` block using
+/// text manipulation.  The rest of the file (comments, other sections) is
+/// byte-for-byte unchanged.
+fn patch_model_subfield(content: &str, key: &str, value: &str) -> String {
+    let mut lines: Vec<String> = content.lines().map(String::from).collect();
+    let n = lines.len();
+    let trailing_newline = content.ends_with('\n');
+
+    // Find last top-level `model:` line
+    let mut model_idx: Option<usize> = None;
+    for (i, line) in lines.iter().enumerate() {
+        if is_top_level_model_key(line) {
+            model_idx = Some(i);
+        }
+    }
+
+    let model_idx = match model_idx {
+        Some(idx) => idx,
+        None => {
+            lines.push("model:".into());
+            lines.push(format!("  {}: \"{}\"", key, escape_yaml_string(value)));
+            let mut out = lines.join("\n");
+            if trailing_newline { out.push('\n'); }
+            return out;
+        }
+    };
+
+    let mut found = false;
+    let mut i = model_idx + 1;
+    while i < n {
+        let line = &lines[i];
+        let is_indented = line.starts_with(' ') || line.starts_with('\t');
+        let is_blank    = line.trim().is_empty();
+        if !is_indented && !is_blank { break; }
+        if is_indented {
+            let trimmed = line.trim().to_string();
+            let indent = yaml_indent(line).to_string();
+            if !trimmed.starts_with('#') && trimmed.starts_with(&format!("{}:", key)) {
+                lines[i] = format!("{}{}: \"{}\"", indent, key, escape_yaml_string(value));
+                found = true;
+                break;
+            }
+        }
+        i += 1;
+    }
+
+    if !found {
+        lines.insert(model_idx + 1, format!("  {}: \"{}\"", key, escape_yaml_string(value)));
+    }
+
+    let mut out = lines.join("\n");
+    if trailing_newline { out.push('\n'); }
+    out
+}
+
+/// Append a `custom_providers:` list item if the provider (by name) is not already present.
+/// The existing file content — including all comments in the block — is never touched.
+fn ensure_custom_provider(content: &str, provider_name: &str, item_yaml: &str) -> String {
+    // If both markers exist, the entry is already there — nothing to do.
+    if content.contains("custom_providers:")
+        && content.contains(&format!("name: {}", provider_name))
+    {
+        return content.to_string();
+    }
+
+    let trailing_newline = content.ends_with('\n');
+    let mut lines: Vec<String> = content.lines().map(String::from).collect();
+
+    if !content.contains("custom_providers:") {
+        // No block yet — append a brand new one.
+        if !lines.is_empty() {
+            lines.push(String::new()); // blank separator line
+        }
+        lines.push("custom_providers:".into());
+        for l in item_yaml.lines() {
+            lines.push(l.to_string());
+        }
+    } else {
+        // Block exists — find where it ends and insert the new item there.
+        let custom_idx = lines
+            .iter()
+            .position(|l| l.trim_end() == "custom_providers:")
+            .unwrap();
+        let n = lines.len();
+        let mut block_end = custom_idx + 1;
+        while block_end < n {
+            let l = &lines[block_end];
+            if !l.starts_with(' ') && !l.starts_with('\t') && !l.trim().is_empty() {
+                break;
+            }
+            block_end += 1;
+        }
+        // Insert item lines just before the next top-level section.
+        let item_lines: Vec<String> = item_yaml.lines().map(String::from).collect();
+        for (j, il) in item_lines.iter().enumerate() {
+            lines.insert(block_end + j, il.clone());
+        }
+    }
+
+    let mut out = lines.join("\n");
+    if trailing_newline { out.push('\n'); }
+    out
+}
+
+#[tauri::command]
+pub async fn apply_provider_yaml_patch(patch_yaml: String) -> Result<(), String> {
+    let path = config_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create config dir: {e}"))?;
+    }
+
+    let patch: serde_yaml::Value = serde_yaml::from_str(&patch_yaml)
+        .map_err(|e| format!("Failed to parse patch YAML: {e}"))?;
+
+    let mut content = if path.exists() {
+        std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read config: {e}"))?
+    } else {
+        String::new()
+    };
+
+    // 1. Patch model sub-fields (text-based, preserves comments)
+    if let Some(serde_yaml::Value::Mapping(model_fields)) = patch.get("model") {
+        for (k, v) in model_fields {
+            if let (serde_yaml::Value::String(key), serde_yaml::Value::String(val)) = (k, v) {
+                content = patch_model_subfield(&content, key, val);
+            }
+        }
+    }
+
+    // 2. Ensure each custom_providers item exists (append-if-missing, text-based)
+    if let Some(serde_yaml::Value::Sequence(items)) = patch.get("custom_providers") {
+        for item in items {
+            let name = match item.get("name").and_then(|v| v.as_str()) {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+            // Serialize only this one item (not the whole file) to build the list entry text.
+            let raw = serde_yaml::to_string(item)
+                .unwrap_or_default();
+            let raw = raw.trim_start_matches("---\n").trim_start_matches("---").trim_start();
+            // Indent as a YAML list item under custom_providers: (2-space indent + "- " prefix)
+            let item_yaml: String = raw
+                .lines()
+                .enumerate()
+                .map(|(i, l)| {
+                    if i == 0 { format!("  - {}", l) } else { format!("    {}", l) }
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            content = ensure_custom_provider(&content, &name, &item_yaml);
+        }
+    }
+
+    std::fs::write(&path, content)
+        .map_err(|e| format!("Failed to write config: {e}"))
 }
 
 #[tauri::command]
 pub async fn test_api_connection(provider: String, key: String) -> Result<bool, String> {
-    let known_providers = ["openrouter", "openai", "anthropic", "google", "custom"];
+    let known_providers = ["openrouter", "openai", "anthropic", "google", "custom", "nvidia"];
     if key.is_empty() {
         return Err("API key is empty".into());
     }
@@ -259,14 +625,30 @@ provider: "openai"
     }
 
     #[test]
-    fn test_config_roundtrip_with_language() {
+    fn test_save_only_writes_model_fields() {
+        // save_to must only touch model.provider and model.default
+        // — other Hermes fields (terminal, memory, compression …) must be preserved
+        let yaml = "memory:\n  memory_enabled: true\ncompression:\n  enabled: true\n";
         let dir = tempdir().unwrap();
         let path = dir.path().join("config.yaml");
+        std::fs::write(&path, yaml).unwrap();
+
         let mut cfg = HermesConfig::default();
-        cfg.language = "en".to_string();
+        cfg.provider = "anthropic".to_string();
+        cfg.model = "claude-opus-4-5".to_string();
         cfg.save_to(&path).unwrap();
-        let loaded = HermesConfig::load_from(&path).unwrap();
-        assert_eq!(loaded.language, "en");
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        // Model fields must be written
+        assert!(content.contains("provider: anthropic"), "provider missing");
+        assert!(content.contains("claude-opus-4-5"), "model missing");
+        // Existing fields must be preserved
+        assert!(content.contains("memory_enabled: true"), "memory wiped");
+        assert!(content.contains("compression"), "compression wiped");
+        // Non-Hermes keys must NOT be injected
+        assert!(!content.contains("memory_limit_mb"), "spurious field written");
+        assert!(!content.contains("persistent_memory"), "spurious field written");
+        assert!(!content.contains("language:"), "spurious field written");
     }
 
     #[tokio::test]

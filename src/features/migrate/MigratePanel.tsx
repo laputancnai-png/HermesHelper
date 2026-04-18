@@ -1,6 +1,6 @@
 // src/features/migrate/MigratePanel.tsx
 import { useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { theme as P } from "../../theme";
 import { Btn } from "../../components/shared";
 import { Commands } from "../../lib/tauri";
@@ -14,14 +14,13 @@ export function MigratePanel() {
   async function handleExport() {
     setMsg("");
     try {
-      const savePath = await open({
+      const savePath = await save({
         title: "选择导出位置",
         filters: [{ name: "ZIP", extensions: ["zip"] }],
-        directory: false,
         defaultPath: `hermes-backup-${new Date().toISOString().slice(0,10)}.zip`,
-      } as Parameters<typeof open>[0]);
+      });
       if (!savePath) return;
-      await Commands.exportData(["config", "data"], false, savePath as string);
+      await Commands.exportData(["all"], true, savePath);
       setMsg(t.migrate.exportOk);
     } catch (e) {
       setMsg(`${t.migrate.exportFailed}: ${e instanceof Error ? e.message : String(e)}`);

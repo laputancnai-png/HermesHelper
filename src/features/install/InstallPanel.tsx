@@ -24,6 +24,7 @@ export function InstallPanel() {
   const [errorMsg, setErrorMsg] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [showUninstallOpts, setShowUninstallOpts] = useState(false);
+  const [uninstalling, setUninstalling] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -81,6 +82,7 @@ export function InstallPanel() {
 
   async function handleUninstall() {
     if (!confirm(t.install.uninstallConfirm)) return;
+    setUninstalling(true);
     try {
       await Commands.uninstallHermes();
       showToast(t.toast.uninstallSuccess, "success");
@@ -88,6 +90,8 @@ export function InstallPanel() {
       setTimeout(refreshStatus, 500);
     } catch (e) {
       showToast(`${t.toast.uninstallFailed}: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } finally {
+      setUninstalling(false);
     }
   }
 
@@ -131,8 +135,8 @@ export function InstallPanel() {
             {t.install.uninstallClean}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <Btn small color={P.coral} onClick={handleUninstall}>{t.install.uninstall}</Btn>
-            <Btn small ghost onClick={() => setShowUninstallOpts(false)}>取消</Btn>
+            <Btn small color={P.coral} onClick={handleUninstall} loading={uninstalling} disabled={uninstalling}>{t.install.uninstall}</Btn>
+            <Btn small ghost onClick={() => setShowUninstallOpts(false)} disabled={uninstalling}>取消</Btn>
           </div>
         </div>
       )}
