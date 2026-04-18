@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{config, gateway, installer, migrate, process, status, tools};
+use commands::{chat, config, gateway, installer, migrate, process, status, tools};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -47,6 +47,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            chat::hermes_chat,
             installer::detect_platform,
             installer::check_hermes_version,
             installer::install_hermes,
@@ -54,6 +55,7 @@ pub fn run() {
             config::get_config,
             config::save_config,
             config::save_api_key,
+            config::apply_provider_yaml_patch,
             config::test_api_connection,
             config::get_system_locale,
             process::run_doctor,
