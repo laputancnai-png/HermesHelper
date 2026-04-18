@@ -47,12 +47,7 @@ export function DashboardPage() {
 
   if (ready) {
     return (
-      <div style={{
-        height: "calc(100vh - 100px)", minHeight: 500,
-        borderRadius: 16, overflow: "hidden",
-        border: "2px solid #EBEBF8",
-        boxShadow: "0 8px 24px #00000010",
-      }}>
+      <div style={{ width: "100%", height: "calc(100vh - 56px)" }}>
         <iframe
           src={DASHBOARD_URL}
           style={{ width: "100%", height: "100%", border: "none", display: "block" }}
@@ -64,7 +59,7 @@ export function DashboardPage() {
 
   return (
     <div style={{
-      height: "calc(100vh - 100px)", minHeight: 500,
+      height: "calc(100vh - 56px)", minHeight: 500,
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
       background: P.white, borderRadius: 22,

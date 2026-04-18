@@ -132,18 +132,20 @@ function AppInner() {
       </div>
 
       {/* Main content */}
-      <main style={{ maxWidth: 880, margin: "28px auto 0", padding: "0 20px 40px" }}>
-        {page === "manage" && (
-          <>
-            <HermesStatusPanel />
-            <InstallPanel />
-            <ModelPanel />
-            <MigratePanel />
-          </>
-        )}
-        {page === "chat" && <ChatPage />}
-        {page === "dashboard" && <DashboardPage />}
-      </main>
+      {page !== "dashboard" && (
+        <main style={{ maxWidth: 880, margin: "28px auto 0", padding: "0 20px 40px" }}>
+          {page === "manage" && (
+            <>
+              <HermesStatusPanel />
+              <InstallPanel />
+              <ModelPanel />
+              <MigratePanel />
+            </>
+          )}
+          {page === "chat" && <ChatPage />}
+        </main>
+      )}
+      {page === "dashboard" && <DashboardPage />}
 
       <Toast />
     </div>
