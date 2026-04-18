@@ -150,6 +150,9 @@ export const Commands = {
 
   hermesChat: (message: string, sessionId?: string): Promise<ChatReply> =>
     tauriInvoke("hermes_chat", { message, sessionId: sessionId ?? null }),
+
+  checkDashboardReady: (): Promise<boolean> =>
+    tauriInvoke("check_dashboard_ready"),
 };
 
 // ── Events ────────────────────────────────────────────────────
