@@ -5,12 +5,13 @@ import { Btn } from "../../components/shared";
 import { useLang } from "../../i18n";
 import { Commands } from "../../lib/tauri";
 
-const DASHBOARD_URL = "http://127.0.0.1:9119";
+const DASHBOARD_BASE = "http://127.0.0.1:9119";
 const POLL_INTERVAL_MS = 500;
 const POLL_MAX_ATTEMPTS = 30; // 15 seconds
 
 export function DashboardPage() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const dashboardSrc = `${DASHBOARD_BASE}?lang=${lang === "zh" ? "zh-CN" : "en"}`;
   const [ready, setReady] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [attempts, setAttempts] = useState(0);
@@ -48,14 +49,13 @@ export function DashboardPage() {
 
   if (ready) {
     return (
-      <div style={{
-        height: "calc(100vh - 100px)", minHeight: 500,
-        borderRadius: 16, overflow: "hidden",
-        border: "2px solid #EBEBF8",
-      }}>
+      <div style={{ width: "100%", height: "100%", overflow: "hidden" }}>
         <iframe
-          src={DASHBOARD_URL}
-          style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+          src={dashboardSrc}
+          style={{
+            width: "100%", height: "100%", border: "none", display: "block",
+            filter: "hue-rotate(50deg) saturate(0.88) brightness(1.02)",
+          }}
           title="Hermes Dashboard"
         />
       </div>
@@ -64,12 +64,10 @@ export function DashboardPage() {
 
   return (
     <div style={{
-      height: "calc(100vh - 100px)", minHeight: 500,
+      width: "100%", height: "100%",
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
-      background: P.white, borderRadius: 22,
-      border: "2px solid #EBEBF8", boxShadow: "0 8px 24px #00000010",
-      gap: 16,
+      background: P.white, gap: 16,
     }}>
       {timedOut ? (
         <>

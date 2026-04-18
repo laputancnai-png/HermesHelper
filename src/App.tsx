@@ -131,19 +131,29 @@ function AppInner() {
         <LangPicker />
       </div>
 
+      {/* Dashboard — full-screen below nav */}
+      {page === "dashboard" && (
+        <div style={{
+          position: "fixed", top: P.nav.height, left: 0, right: 0, bottom: 0, zIndex: 10,
+        }}>
+          <DashboardPage />
+        </div>
+      )}
+
       {/* Main content */}
-      <main style={{ maxWidth: 880, margin: "28px auto 0", padding: "0 20px 40px" }}>
-        {page === "manage" && (
-          <>
-            <HermesStatusPanel />
-            <InstallPanel />
-            <ModelPanel />
-            <MigratePanel />
-          </>
-        )}
-        {page === "chat" && <ChatPage />}
-        {page === "dashboard" && <DashboardPage />}
-      </main>
+      {page !== "dashboard" && (
+        <main style={{ maxWidth: 880, margin: "28px auto 0", padding: "0 20px 40px" }}>
+          {page === "manage" && (
+            <>
+              <HermesStatusPanel />
+              <InstallPanel />
+              <ModelPanel />
+              <MigratePanel />
+            </>
+          )}
+          {page === "chat" && <ChatPage />}
+        </main>
+      )}
 
       <Toast />
     </div>
