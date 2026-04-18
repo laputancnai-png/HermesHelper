@@ -1,4 +1,5 @@
 // src/App.tsx
+import { useState } from "react";
 import { LangProvider, useLang } from "./i18n";
 import { useStore } from "./store";
 import { theme as P } from "./theme";
@@ -6,6 +7,7 @@ import { HermesStatusPanel } from "./features/status/HermesStatusPanel";
 import { InstallPanel } from "./features/install/InstallPanel";
 import { ModelPanel } from "./features/model/ModelPanel";
 import { MigratePanel } from "./features/migrate/MigratePanel";
+import { ChatPage } from "./features/chat/ChatPage";
 
 const LANGS = [
   { code: "zh" as const, label: "中文", flag: "🇨🇳" },
@@ -64,6 +66,12 @@ function Toast() {
 
 function AppInner() {
   const { t } = useLang();
+  const [page, setPage] = useState<"manage" | "chat">("manage");
+
+  const NAV_TABS = [
+    { id: "manage" as const, label: t.nav.manage, emoji: "🤖" },
+    { id: "chat"   as const, label: t.nav.chat,   emoji: "" },
+  ];
 
   return (
     <div style={{ minHeight: "100vh", background: P.bg, fontFamily: "Nunito,sans-serif" }}>
@@ -77,21 +85,61 @@ function AppInner() {
         padding: "0 24px",
         boxShadow: "0 2px 8px rgba(91,95,239,0.06)",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 16, flexShrink: 0 }}>
           <span style={{ fontSize: 26 }}>🤖</span>
           <span style={{ fontFamily: "Fredoka One,cursive", fontSize: 18, color: P.ink }}>
             {t.app.brand}
           </span>
         </div>
+
+        {/* Tab nav */}
+        <div style={{ display: "flex", flex: 1, alignItems: "center" }}>
+          {NAV_TABS.map(tab => {
+            const active = page === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setPage(tab.id)}
+                style={{
+                  background: "transparent",
+                  color: active ? P.indigo : P.soft,
+                  border: "none",
+                  borderBottom: active ? `3px solid ${P.indigo}` : "3px solid transparent",
+                  borderTop: "3px solid transparent",
+                  padding: "0 16px",
+                  height: P.nav.height,
+                  fontSize: 13, fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "Nunito,sans-serif",
+                  transition: "color 0.12s",
+                  whiteSpace: "nowrap",
+                  display: "flex", alignItems: "center", gap: 5,
+                }}
+                onMouseEnter={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = P.ink; }}
+                onMouseLeave={e => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = P.soft; }}
+              >
+                {tab.id === "manage" && <span>{tab.emoji}</span>}
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
         <LangPicker />
       </div>
 
       {/* Main content */}
       <main style={{ maxWidth: 880, margin: "28px auto 0", padding: "0 20px 40px" }}>
-        <HermesStatusPanel />
-        <InstallPanel />
-        <ModelPanel />
-        <MigratePanel />
+        {page === "manage" && (
+          <>
+            <HermesStatusPanel />
+            <InstallPanel />
+            <ModelPanel />
+            <MigratePanel />
+          </>
+        )}
+        {page === "chat" && <ChatPage />}
       </main>
 
       <Toast />
