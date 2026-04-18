@@ -71,6 +71,11 @@ export interface ImportSummary {
   skipped: number;
 }
 
+export interface ChatReply {
+  reply: string;
+  sessionId: string;
+}
+
 // ── Commands ──────────────────────────────────────────────────
 
 export const Commands = {
@@ -95,8 +100,11 @@ export const Commands = {
   saveConfig: (config: HermesConfig): Promise<void> =>
     tauriInvoke("save_config", { config }),
 
-  saveApiKey: (key: string): Promise<void> =>
-    tauriInvoke("save_api_key", { key }),
+  saveApiKey: (provider: string, key: string): Promise<void> =>
+    tauriInvoke("save_api_key", { provider, key }),
+
+  applyProviderYamlPatch: (patchYaml: string): Promise<void> =>
+    tauriInvoke("apply_provider_yaml_patch", { patchYaml }),
 
   testApiConnection: (provider: string, key: string): Promise<boolean> =>
     tauriInvoke("test_api_connection", { provider, key }),
@@ -139,6 +147,9 @@ export const Commands = {
 
   executeImport: (zipPath: string, selectedFiles: string[]): Promise<ImportSummary> =>
     tauriInvoke("execute_import", { zipPath, selectedFiles }),
+
+  hermesChat: (message: string, sessionId?: string): Promise<ChatReply> =>
+    tauriInvoke("hermes_chat", { message, sessionId: sessionId ?? null }),
 };
 
 // ── Events ────────────────────────────────────────────────────

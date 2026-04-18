@@ -3,7 +3,7 @@ import { createContext, useContext, useState, ReactNode } from "react";
 
 const ZH = {
   app: { brand: "Hermes Manager", tagline: "Hermes AI 助手管理器" },
-  nav: { lang: "语言" },
+  nav: { lang: "语言", manage: "管理", chat: "💬 聊天" },
   status: {
     installed: "已安装", notInstalled: "未安装",
     running: "运行中", stopped: "已停止",
@@ -46,11 +46,24 @@ const ZH = {
     installSuccess: "安装成功！", installFailed: "安装失败",
     uninstallSuccess: "卸载成功", uninstallFailed: "卸载失败",
   },
+  chat: {
+    title: "Hermes 聊天",
+    subtitle: "与 Hermes AI 助手直接对话",
+    send: "发送",
+    sending: "发送中",
+    placeholder: "输入消息… (Cmd+Enter 发送)",
+    newSession: "新对话",
+    sessionLabel: "会话",
+    thinking: "Hermes 思考中…",
+    empty: "发消息开始与 Hermes 对话",
+    error: "发送失败",
+    cleared: "已开始新对话",
+  },
 };
 
 const EN: typeof ZH = {
   app: { brand: "Hermes Manager", tagline: "Hermes AI Agent Manager" },
-  nav: { lang: "Language" },
+  nav: { lang: "Language", manage: "Manage", chat: "💬 Chat" },
   status: {
     installed: "Installed", notInstalled: "Not Installed",
     running: "Running", stopped: "Stopped",
@@ -92,6 +105,19 @@ const EN: typeof ZH = {
   toast: {
     installSuccess: "Install successful!", installFailed: "Install failed",
     uninstallSuccess: "Uninstall successful", uninstallFailed: "Uninstall failed",
+  },
+  chat: {
+    title: "Hermes Chat",
+    subtitle: "Chat directly with your Hermes AI agent",
+    send: "Send",
+    sending: "Sending",
+    placeholder: "Type a message… (Cmd+Enter to send)",
+    newSession: "New Chat",
+    sessionLabel: "Session",
+    thinking: "Hermes is thinking…",
+    empty: "Send a message to start chatting with Hermes",
+    error: "Send failed",
+    cleared: "New conversation started",
   },
 };
 
