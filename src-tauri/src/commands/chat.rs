@@ -8,25 +8,12 @@ pub struct ChatReply {
     pub session_id: String,
 }
 
-fn parse_hermes_output(raw: &str) -> (String, String) {
-    let mut session_id = String::new();
-    let mut reply_lines: Vec<&str> = Vec::new();
-    let mut found = false;
-
-    for line in raw.lines() {
-        if !found {
-            if let Some(id) = line.strip_prefix("session_id: ") {
-                session_id = id.trim().to_string();
-                found = true;
-            }
-            // skip lines before session_id (e.g. "↻ Resumed session ...")
-        } else {
-            reply_lines.push(line);
-        }
-    }
-
-    let reply = reply_lines.join("\n").trim().to_string();
-    (reply, session_id)
+/// Extract session_id from any text (stdout or stderr).
+/// Returns the first matching "session_id: <id>" line value.
+fn extract_session_id(text: &str) -> Option<String> {
+    text.lines()
+        .find_map(|line| line.strip_prefix("session_id: ").map(|id| id.trim().to_string()))
+        .filter(|id| !id.is_empty())
 }
 
 #[tauri::command]
@@ -58,8 +45,15 @@ pub async fn hermes_chat(
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
-    if !output.status.success() && stdout.trim().is_empty() {
-        let msg = if stderr.is_empty() {
+    // session_id may appear in stderr or stdout depending on Hermes version
+    let sid = extract_session_id(&stderr)
+        .or_else(|| extract_session_id(&stdout))
+        .ok_or_else(|| format!("无法解析 session_id，原始输出: {}", stdout.trim()))?;
+
+    // reply is always stdout (trimmed); if stdout is empty and exit failed, return error
+    let reply = stdout.trim().to_string();
+    if reply.is_empty() && !output.status.success() {
+        let msg = if stderr.trim().is_empty() {
             "Hermes 返回错误".to_string()
         } else {
             stderr.trim().to_string()
@@ -67,19 +61,7 @@ pub async fn hermes_chat(
         return Err(msg);
     }
 
-    let (reply, sid) = parse_hermes_output(&stdout);
-
-    if sid.is_empty() {
-        return Err(format!(
-            "无法解析 session_id，原始输出: {}",
-            stdout.trim()
-        ));
-    }
-
-    Ok(ChatReply {
-        reply,
-        session_id: sid,
-    })
+    Ok(ChatReply { reply, session_id: sid })
 }
 
 #[cfg(test)]
@@ -87,34 +69,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_new_session() {
-        let raw = "session_id: abc123\nHello, world!";
-        let (reply, id) = parse_hermes_output(raw);
-        assert_eq!(id, "abc123");
-        assert_eq!(reply, "Hello, world!");
+    fn test_session_id_from_stderr() {
+        let stderr = "\nsession_id: abc123\n";
+        assert_eq!(extract_session_id(stderr), Some("abc123".into()));
     }
 
     #[test]
-    fn test_parse_resumed_session() {
-        let raw = "↻ Resumed session abc123 (2 messages)\n\nsession_id: abc123\nHi again!";
-        let (reply, id) = parse_hermes_output(raw);
-        assert_eq!(id, "abc123");
-        assert_eq!(reply, "Hi again!");
+    fn test_session_id_from_stdout() {
+        let stdout = "session_id: xyz789\nHello!";
+        assert_eq!(extract_session_id(stdout), Some("xyz789".into()));
     }
 
     #[test]
-    fn test_parse_multiline_reply() {
-        let raw = "session_id: xyz\nLine one\nLine two\nLine three";
-        let (reply, id) = parse_hermes_output(raw);
-        assert_eq!(id, "xyz");
-        assert_eq!(reply, "Line one\nLine two\nLine three");
+    fn test_session_id_missing() {
+        let text = "Hello! How can I assist you today?";
+        assert_eq!(extract_session_id(text), None);
     }
 
     #[test]
-    fn test_parse_missing_session_id() {
-        let raw = "some unexpected output";
-        let (reply, id) = parse_hermes_output(raw);
-        assert_eq!(id, "");
-        assert_eq!(reply, "");
+    fn test_session_id_with_resumed_prefix() {
+        let stderr = "↻ Resumed session abc123 (2 messages)\n\nsession_id: abc123\n";
+        assert_eq!(extract_session_id(stderr), Some("abc123".into()));
     }
 }
