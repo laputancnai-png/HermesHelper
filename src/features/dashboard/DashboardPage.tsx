@@ -1,33 +1,26 @@
 // src/features/dashboard/DashboardPage.tsx
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { theme as P } from "../../theme";
 import { Btn } from "../../components/shared";
 import { useLang } from "../../i18n";
 import { Commands } from "../../lib/tauri";
 
+const DASHBOARD_URL = "http://127.0.0.1:9119";
 const POLL_INTERVAL_MS = 500;
 const POLL_MAX_ATTEMPTS = 30;
-const NAV_H = P.nav.height; // 56
-
-function getBounds() {
-  return { x: 0, y: NAV_H, width: window.innerWidth, height: window.innerHeight - NAV_H };
-}
 
 export function DashboardPage() {
-  const { t, lang } = useLang();
+  const { t } = useLang();
   const [ready, setReady] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [attempts, setAttempts] = useState(0);
-  const shownRef = useRef(false);
 
   const startPolling = useCallback(() => {
     setReady(false);
     setTimedOut(false);
     setAttempts(0);
-    shownRef.current = false;
   }, []);
 
-  // Polling loop
   useEffect(() => {
     if (ready || timedOut) return;
     let cancelled = false;
@@ -52,43 +45,31 @@ export function DashboardPage() {
     return () => { cancelled = true; };
   }, [ready, timedOut]);
 
-  // Show child webview once ready
-  useEffect(() => {
-    if (!ready) return;
-    const { x, y, width, height } = getBounds();
-    shownRef.current = true;
-    void Commands.showDashboard(lang, x, y, width, height);
-    return () => { void Commands.hideDashboard(); };
-  }, [ready]);
-
-  // Sync language changes after webview is shown
-  useEffect(() => {
-    if (!ready || !shownRef.current) return;
-    void Commands.setDashboardLanguage(lang);
-  }, [lang, ready]);
-
-  // Resize listener
-  useEffect(() => {
-    if (!ready) return;
-    const onResize = () => {
-      const { x, y, width, height } = getBounds();
-      void Commands.resizeDashboard(x, y, width, height);
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [ready]);
-
   if (ready) {
-    // Child webview is shown natively — render invisible placeholder
-    return <div style={{ width: "100%", height: "100%" }} />;
+    return (
+      <div style={{
+        height: "calc(100vh - 100px)", minHeight: 500,
+        borderRadius: 16, overflow: "hidden",
+        border: "2px solid #EBEBF8",
+        boxShadow: "0 8px 24px #00000010",
+      }}>
+        <iframe
+          src={DASHBOARD_URL}
+          style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+          title="Hermes Dashboard"
+        />
+      </div>
+    );
   }
 
   return (
     <div style={{
-      width: "100%", height: "100%",
+      height: "calc(100vh - 100px)", minHeight: 500,
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
-      background: P.white, gap: 16,
+      background: P.white, borderRadius: 22,
+      border: "2px solid #EBEBF8", boxShadow: "0 8px 24px #00000010",
+      gap: 16,
     }}>
       {timedOut ? (
         <>
