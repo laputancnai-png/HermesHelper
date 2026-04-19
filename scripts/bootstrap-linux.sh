@@ -27,6 +27,16 @@ detect_pkg_manager() {
   fi
 }
 
+apt_pick_package() {
+  for pkg in "$@"; do
+    if apt-cache show "$pkg" >/dev/null 2>&1; then
+      echo "$pkg"
+      return 0
+    fi
+  done
+  return 1
+}
+
 install_system_deps() {
   local pm
   pm="$(detect_pkg_manager)"
@@ -48,10 +58,23 @@ EOF
   case "$pm" in
     apt)
       sudo apt-get update
+
+      local webkit_pkg
+      webkit_pkg="$(apt_pick_package libwebkit2gtk-4.1-dev libwebkit2gtk-4.0-dev)" || {
+        echo "[bootstrap] Could not find WebKitGTK dev package (tried 4.1 and 4.0)." >&2
+        exit 1
+      }
+
+      local appindicator_pkg
+      appindicator_pkg="$(apt_pick_package libayatana-appindicator3-dev libappindicator3-dev)" || {
+        echo "[bootstrap] Could not find AppIndicator dev package." >&2
+        exit 1
+      }
+
       sudo apt-get install -y \
         build-essential curl wget file pkg-config libssl-dev \
-        libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
-        patchelf libwebkit2gtk-4.1-dev libxdo-dev
+        libgtk-3-dev "$appindicator_pkg" librsvg2-dev \
+        patchelf "$webkit_pkg" libxdo-dev
       ;;
     dnf)
       sudo dnf install -y \
