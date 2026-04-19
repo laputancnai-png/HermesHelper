@@ -1,9 +1,37 @@
 # HermesHelper 测试指南
 
+## 环境要求
+
+### Linux
+
+- 推荐：Ubuntu 22.04+（或其他发行版，`glib-2.0 >= 2.70`）
+- 不支持：Ubuntu 20.04（GLib 版本不足会在 `glib-sys` 构建阶段失败）
+- 一键准备环境：
+
+```bash
+npm run bootstrap:linux
+```
+
+### macOS
+
+- 推荐：macOS 12+
+- 需要：Xcode Command Line Tools、Rust、Node.js 20+
+- 一键准备环境：
+
+```bash
+npm run bootstrap:macos
+```
+
+### Windows
+
+- 当前仓库暂未完成正式支持（后端命令实现仍有 Unix 假设）
+
 ## 启动应用
 
 ```bash
 cd /Users/laputancnai/HermesHelper
+npm run bootstrap:linux   # Linux 首次执行
+npm run bootstrap:macos   # macOS 首次执行
 npm run tauri dev
 ```
 
