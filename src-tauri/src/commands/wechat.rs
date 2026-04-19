@@ -4,6 +4,8 @@ use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
+use super::config::{env_path, read_env_value, save_wechat_login_to_env};
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct WeChatSetupProgress {
@@ -19,6 +21,10 @@ struct QrEvent {
     url: Option<String>,
     value: Option<String>,
     msg: Option<String>,
+    account_id: Option<String>,
+    token: Option<String>,
+    base_url: Option<String>,
+    user_id: Option<String>,
 }
 
 fn hermes_agent_dir() -> Option<std::path::PathBuf> {
@@ -124,15 +130,20 @@ pub async fn install_wechat_deps(window: tauri::Window) -> Result<(), String> {
 }
 
 /// Check if WeChat credentials have been saved.
-/// Returns true if ~/.hermes/weixin/accounts/ exists and has at least one file.
+/// Returns true if the configured account exists on disk.
 #[tauri::command]
 pub async fn check_wechat_credentials() -> bool {
     let Some(home) = dirs::home_dir() else { return false; };
     let accounts_dir = home.join(".hermes").join("weixin").join("accounts");
-    match tokio::fs::read_dir(&accounts_dir).await {
-        Ok(mut entries) => entries.next_entry().await.ok().flatten().is_some(),
-        Err(_) => false,
+    let Some(account_id) = read_env_value(&env_path(), "WEIXIN_ACCOUNT_ID") else {
+        return false;
+    };
+    if read_env_value(&env_path(), "WEIXIN_TOKEN").is_none() {
+        return false;
     }
+
+    let account_file = accounts_dir.join(format!("{account_id}.json"));
+    tokio::fs::metadata(account_file).await.is_ok()
 }
 
 // Python script that directly calls the weixin iLink API and streams JSON-line events.
@@ -252,7 +263,13 @@ async def main():
                     base_url=base_url,
                     user_id=user_id,
                 )
-                emit({"type": "done", "account_id": account_id})
+                emit({
+                    "type": "done",
+                    "account_id": account_id,
+                    "token": token,
+                    "base_url": base_url,
+                    "user_id": user_id,
+                })
                 return
             else:
                 await asyncio.sleep(1)
@@ -343,6 +360,36 @@ pub async fn setup_wechat_gateway(window: tauri::Window) -> Result<(), String> {
                                 }
                             }
                             "done" => {
+                                  let Some(account_id) = ev.account_id else {
+                                      let msg = "登录成功但缺少 account_id".to_string();
+                                      window.emit("wechat_setup_error", &msg).ok();
+                                      return Err(msg);
+                                  };
+                                  let Some(token) = ev.token else {
+                                      let msg = "登录成功但缺少 token".to_string();
+                                      window.emit("wechat_setup_error", &msg).ok();
+                                      return Err(msg);
+                                  };
+                                  let Some(user_id) = ev.user_id else {
+                                      let msg = "登录成功但缺少 user_id".to_string();
+                                      window.emit("wechat_setup_error", &msg).ok();
+                                      return Err(msg);
+                                  };
+                                  let base_url = ev.base_url.unwrap_or_else(|| {
+                                      "https://ilinkai.wechat.com".to_string()
+                                  });
+
+                                  if let Err(err) = save_wechat_login_to_env(
+                                      &env_path(),
+                                      &account_id,
+                                      &token,
+                                      &base_url,
+                                      &user_id,
+                                  ) {
+                                      window.emit("wechat_setup_error", &err).ok();
+                                      return Err(err);
+                                  }
+
                                 window.emit("wechat_setup_done", ()).ok();
                             }
                             "error" => {

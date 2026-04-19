@@ -9,7 +9,7 @@ fn config_path() -> PathBuf {
     hermes_dir().join("config.yaml")
 }
 
-fn env_path() -> PathBuf {
+pub(crate) fn env_path() -> PathBuf {
     hermes_dir().join(".env")
 }
 
@@ -287,6 +287,78 @@ fn env_line_key(line: &str) -> Option<String> {
     }
     let (left, _) = trimmed.split_once('=')?;
     Some(left.trim().to_string())
+}
+
+pub(crate) fn read_env_value(path: &Path, key: &str) -> Option<String> {
+    let content = std::fs::read_to_string(path).ok()?;
+    for line in content.lines() {
+        if let Some(current_key) = env_line_key(line) {
+            if current_key.eq_ignore_ascii_case(key) {
+                let (_, value) = line.split_once('=')?;
+                return Some(value.trim().to_string());
+            }
+        }
+    }
+    None
+}
+
+fn upsert_env_value(lines: &mut Vec<String>, key: &str, value: &str) {
+    lines.retain(|line| match env_line_key(line) {
+        Some(current_key) => !current_key.eq_ignore_ascii_case(key),
+        None => true,
+    });
+    lines.push(format!("{}={}", key, value));
+}
+
+pub(crate) fn save_wechat_login_to_env(
+    env_path: &Path,
+    account_id: &str,
+    token: &str,
+    base_url: &str,
+    user_id: &str,
+) -> Result<(), String> {
+    let existing = if env_path.exists() {
+        std::fs::read_to_string(env_path).map_err(|e| format!("Failed to read .env: {e}"))?
+    } else {
+        String::new()
+    };
+
+    let mut lines: Vec<String> = existing.lines().map(String::from).collect();
+    upsert_env_value(&mut lines, "WEIXIN_ACCOUNT_ID", account_id.trim());
+    upsert_env_value(&mut lines, "WEIXIN_TOKEN", token.trim());
+    upsert_env_value(&mut lines, "WEIXIN_BASE_URL", base_url.trim());
+    upsert_env_value(&mut lines, "WEIXIN_HOME_CHANNEL", user_id.trim());
+
+    if read_env_value(env_path, "WEIXIN_CDN_BASE_URL").is_none() {
+        upsert_env_value(
+            &mut lines,
+            "WEIXIN_CDN_BASE_URL",
+            "https://novac2c.cdn.weixin.qq.com/c2c",
+        );
+    }
+
+    if read_env_value(env_path, "WEIXIN_DM_POLICY").is_none() {
+        upsert_env_value(&mut lines, "WEIXIN_DM_POLICY", "pairing");
+    }
+    if read_env_value(env_path, "WEIXIN_ALLOW_ALL_USERS").is_none() {
+        upsert_env_value(&mut lines, "WEIXIN_ALLOW_ALL_USERS", "false");
+    }
+    if read_env_value(env_path, "WEIXIN_GROUP_POLICY").is_none() {
+        upsert_env_value(&mut lines, "WEIXIN_GROUP_POLICY", "open");
+    }
+    if read_env_value(env_path, "WEIXIN_ALLOWED_USERS").is_none() {
+        upsert_env_value(&mut lines, "WEIXIN_ALLOWED_USERS", "");
+    }
+    if read_env_value(env_path, "WEIXIN_GROUP_ALLOWED_USERS").is_none() {
+        upsert_env_value(&mut lines, "WEIXIN_GROUP_ALLOWED_USERS", "");
+    }
+
+    if let Some(parent) = env_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {e}"))?;
+    }
+
+    let content = lines.join("\n") + "\n";
+    std::fs::write(env_path, content).map_err(|e| format!("Failed to write .env: {e}"))
 }
 
 fn ensure_nvidia_shell_block() -> Result<(), String> {
@@ -622,6 +694,39 @@ provider: "openai"
         std::fs::write(&path, format!("LLM_API_KEY={key}\n")).unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
         assert!(content.contains("LLM_API_KEY=sk-test-1234567890"));
+    }
+
+    #[test]
+    fn test_save_wechat_login_to_env_writes_runtime_keys() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join(".env");
+        std::fs::write(
+            &path,
+            "OTHER=value\nWEIXIN_DM_POLICY=pairing\nWEIXIN_ALLOW_ALL_USERS=false\n",
+        )
+        .unwrap();
+
+        save_wechat_login_to_env(
+            &path,
+            "ef67f47fde1d@im.bot",
+            "ef67f47fde1d@im.bot:token",
+            "https://ilinkai.wechat.com",
+            "o9cq80y9hyw4DRq-PNpfrtlnnzLA@im.wechat",
+        )
+        .unwrap();
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(content.contains("WEIXIN_ACCOUNT_ID=ef67f47fde1d@im.bot"));
+        assert!(content.contains("WEIXIN_TOKEN=ef67f47fde1d@im.bot:token"));
+        assert!(content.contains("WEIXIN_BASE_URL=https://ilinkai.wechat.com"));
+        assert!(content.contains("WEIXIN_HOME_CHANNEL=o9cq80y9hyw4DRq-PNpfrtlnnzLA@im.wechat"));
+        assert!(content.contains("WEIXIN_CDN_BASE_URL=https://novac2c.cdn.weixin.qq.com/c2c"));
+        assert!(content.contains("WEIXIN_DM_POLICY=pairing"));
+        assert!(content.contains("WEIXIN_ALLOW_ALL_USERS=false"));
+        assert!(content.contains("WEIXIN_GROUP_POLICY=open"));
+        assert!(content.contains("WEIXIN_ALLOWED_USERS="));
+        assert!(content.contains("WEIXIN_GROUP_ALLOWED_USERS="));
+        assert!(content.contains("OTHER=value"));
     }
 
     #[test]
