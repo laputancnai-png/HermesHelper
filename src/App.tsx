@@ -9,6 +9,7 @@ import { ModelPanel } from "./features/model/ModelPanel";
 import { MigratePanel } from "./features/migrate/MigratePanel";
 import { ChatPage } from "./features/chat/ChatPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
+import { ChannelsPanel } from "./features/channels/ChannelsPanel";
 
 const LANGS = [
   { code: "zh" as const, label: "中文", flag: "🇨🇳" },
@@ -67,11 +68,12 @@ function Toast() {
 
 function AppInner() {
   const { t } = useLang();
-  const [page, setPage] = useState<"manage" | "chat" | "dashboard">("manage");
+  const [page, setPage] = useState<"manage" | "chat" | "channels" | "dashboard">("manage");
 
   const NAV_TABS = [
     { id: "manage"    as const, label: t.nav.manage,    emoji: "🤖" },
     { id: "chat"      as const, label: t.nav.chat,      emoji: ""   },
+    { id: "channels"  as const, label: t.nav.channels,  emoji: ""   },
     { id: "dashboard" as const, label: t.nav.dashboard, emoji: ""   },
   ];
 
@@ -133,7 +135,11 @@ function AppInner() {
 
       {/* Main content */}
       {page !== "dashboard" && (
-        <main style={{ maxWidth: 880, margin: "28px auto 0", padding: "0 20px 40px" }}>
+        <main style={{
+          maxWidth: page === "channels" ? 1200 : 880,
+          margin: "28px auto 0",
+          padding: page === "channels" ? "0 16px 40px" : "0 20px 40px",
+        }}>
           {page === "manage" && (
             <>
               <HermesStatusPanel />
@@ -143,6 +149,7 @@ function AppInner() {
             </>
           )}
           {page === "chat" && <ChatPage />}
+          {page === "channels" && <ChannelsPanel />}
         </main>
       )}
       {page === "dashboard" && <DashboardPage />}

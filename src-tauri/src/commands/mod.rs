@@ -7,3 +7,4 @@ pub mod migrate;
 pub mod process;
 pub mod status;
 pub mod tools;
+pub mod wechat;

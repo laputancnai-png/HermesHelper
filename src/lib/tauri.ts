@@ -60,6 +60,21 @@ export interface GatewayStatus {
   running: boolean;
 }
 
+export interface BotInfo {
+  username: string;
+  firstName: string;
+}
+
+export type WeChatPhase =
+  | "idle" | "deps_checking" | "deps_needed" | "deps_installing"
+  | "setup_waiting" | "setup_running" | "qr_shown" | "scan_waiting" | "pairing" | "done";
+
+export interface WeChatSetupProgress {
+  line: string;
+  phase: WeChatPhase;
+  qrUrl: string | null;
+}
+
 export interface ImportFileInfo {
   path: string;
   category: string;
@@ -139,6 +154,24 @@ export const Commands = {
   stopGateway: (): Promise<void> =>
     tauriInvoke("stop_gateway"),
 
+  verifyBotToken: (token: string): Promise<BotInfo> =>
+    tauriInvoke("verify_bot_token", { token }),
+
+  approvePairing: (platform: string, code: string): Promise<void> =>
+    tauriInvoke("approve_pairing", { platform, code }),
+
+  checkWechatDeps: (): Promise<boolean> =>
+    tauriInvoke("check_wechat_deps"),
+
+  installWechatDeps: (): Promise<void> =>
+    tauriInvoke("install_wechat_deps"),
+
+  checkWechatCredentials: (): Promise<boolean> =>
+    tauriInvoke("check_wechat_credentials"),
+
+  setupWechatGateway: (): Promise<void> =>
+    tauriInvoke("setup_wechat_gateway"),
+
   exportData: (items: string[], includeApiKeys: boolean, savePath: string): Promise<void> =>
     tauriInvoke("export_data", { items, includeApiKeys, savePath }),
 
@@ -180,4 +213,15 @@ export const Events = {
 
   onInstallError: (handler: (msg: string) => void): Promise<UnlistenFn> =>
     tauriListen<string>("install_error", (e) => handler(e.payload)),
+
+  onWeChatSetupProgress: (
+    handler: (p: WeChatSetupProgress) => void
+  ): Promise<UnlistenFn> =>
+    tauriListen<WeChatSetupProgress>("wechat_setup_progress", (e) => handler(e.payload)),
+
+  onWeChatSetupDone: (handler: () => void): Promise<UnlistenFn> =>
+    tauriListen("wechat_setup_done", () => handler()),
+
+  onWeChatSetupError: (handler: (msg: string) => void): Promise<UnlistenFn> =>
+    tauriListen<string>("wechat_setup_error", (e) => handler(e.payload)),
 };

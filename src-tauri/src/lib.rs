@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{chat, config, dashboard, gateway, installer, migrate, process, status, tools};
+use commands::{chat, config, dashboard, gateway, installer, migrate, process, status, tools, wechat};
 use commands::dashboard::DashboardWebview;
 use tauri::{
     menu::{Menu, MenuItem},
@@ -85,6 +85,12 @@ pub fn run() {
             gateway::get_gateway_status,
             gateway::start_gateway,
             gateway::stop_gateway,
+            gateway::verify_bot_token,
+            gateway::approve_pairing,
+            wechat::check_wechat_deps,
+            wechat::install_wechat_deps,
+            wechat::check_wechat_credentials,
+            wechat::setup_wechat_gateway,
             migrate::export_data,
             migrate::preview_import,
             migrate::execute_import,
