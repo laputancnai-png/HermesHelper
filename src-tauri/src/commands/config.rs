@@ -337,11 +337,24 @@ pub(crate) fn save_wechat_login_to_env(
         );
     }
 
-    if read_env_value(env_path, "WEIXIN_DM_POLICY").is_none() {
-        upsert_env_value(&mut lines, "WEIXIN_DM_POLICY", "pairing");
-    }
+    let global_allow_all = read_env_value(env_path, "GATEWAY_ALLOW_ALL_USERS")
+        .map(|v| v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
     if read_env_value(env_path, "WEIXIN_ALLOW_ALL_USERS").is_none() {
-        upsert_env_value(&mut lines, "WEIXIN_ALLOW_ALL_USERS", "false");
+        upsert_env_value(
+            &mut lines,
+            "WEIXIN_ALLOW_ALL_USERS",
+            if global_allow_all { "true" } else { "false" },
+        );
+    }
+
+    if read_env_value(env_path, "WEIXIN_DM_POLICY").is_none() {
+        upsert_env_value(
+            &mut lines,
+            "WEIXIN_DM_POLICY",
+            if global_allow_all { "open" } else { "pairing" },
+        );
     }
     if read_env_value(env_path, "WEIXIN_GROUP_POLICY").is_none() {
         upsert_env_value(&mut lines, "WEIXIN_GROUP_POLICY", "open");
@@ -727,6 +740,27 @@ provider: "openai"
         assert!(content.contains("WEIXIN_ALLOWED_USERS="));
         assert!(content.contains("WEIXIN_GROUP_ALLOWED_USERS="));
         assert!(content.contains("OTHER=value"));
+    }
+
+    #[test]
+    fn test_save_wechat_login_inherits_global_allow_all_defaults() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join(".env");
+        std::fs::write(&path, "GATEWAY_ALLOW_ALL_USERS=true\n").unwrap();
+
+        save_wechat_login_to_env(
+            &path,
+            "ef67f47fde1d@im.bot",
+            "ef67f47fde1d@im.bot:token",
+            "https://ilinkai.wechat.com",
+            "o9cq80y9hyw4DRq-PNpfrtlnnzLA@im.wechat",
+        )
+        .unwrap();
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(content.contains("GATEWAY_ALLOW_ALL_USERS=true"));
+        assert!(content.contains("WEIXIN_ALLOW_ALL_USERS=true"));
+        assert!(content.contains("WEIXIN_DM_POLICY=open"));
     }
 
     #[test]
