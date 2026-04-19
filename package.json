@@ -10,7 +10,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "coverage": "vitest run --coverage",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "bootstrap:linux": "bash ./scripts/bootstrap-linux.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
