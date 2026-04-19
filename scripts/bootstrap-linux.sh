@@ -27,6 +27,35 @@ detect_pkg_manager() {
   fi
 }
 
+version_ge() {
+  [ "$1" = "$2" ] && return 0
+  [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -n1)" = "$2" ]
+}
+
+check_glib_version() {
+  if ! command -v pkg-config >/dev/null 2>&1; then
+    echo "[bootstrap] pkg-config is missing; cannot verify glib version." >&2
+    exit 1
+  fi
+
+  if ! pkg-config --exists glib-2.0; then
+    echo "[bootstrap] glib-2.0 development files are missing." >&2
+    echo "[bootstrap] Install libglib2.0-dev (apt) or glib2-devel (dnf) and rerun." >&2
+    exit 1
+  fi
+
+  local glib_version
+  glib_version="$(pkg-config --modversion glib-2.0)"
+  if ! version_ge "$glib_version" "2.70"; then
+    cat >&2 <<EOF
+[bootstrap] Installed glib-2.0 is too old: $glib_version
+[bootstrap] This project's current Tauri/Rust dependency chain requires glib >= 2.70.
+[bootstrap] On Ubuntu, please use 22.04+ (or a distro with newer glib) before running the app.
+EOF
+    exit 1
+  fi
+}
+
 apt_pick_package() {
   for pkg in "$@"; do
     if apt-cache show "$pkg" >/dev/null 2>&1; then
@@ -72,20 +101,23 @@ EOF
       }
 
       sudo apt-get install -y \
-        build-essential curl wget file pkg-config libssl-dev \
+        build-essential curl wget file pkg-config libssl-dev libglib2.0-dev \
         libgtk-3-dev "$appindicator_pkg" librsvg2-dev \
         patchelf "$webkit_pkg" libxdo-dev
+      check_glib_version
       ;;
     dnf)
       sudo dnf install -y \
         gcc gcc-c++ make curl wget file pkgconf-pkg-config openssl-devel \
-        gtk3-devel libappindicator-gtk3-devel librsvg2-devel \
+        glib2-devel gtk3-devel libappindicator-gtk3-devel librsvg2-devel \
         patchelf webkit2gtk4.1-devel xdotool
+      check_glib_version
       ;;
     pacman)
       sudo pacman -Sy --needed --noconfirm \
         base-devel curl wget file pkgconf openssl \
-        gtk3 libappindicator-gtk3 librsvg webkit2gtk patchelf xdotool
+        glib2 gtk3 libappindicator-gtk3 librsvg webkit2gtk patchelf xdotool
+      check_glib_version
       ;;
   esac
 }
