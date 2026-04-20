@@ -154,7 +154,7 @@ impl HermesConfig {
 // updated (or inserted if absent).  No YAML parse-serialize cycle.
 
 fn yaml_indent(line: &str) -> &str {
-    let n = line.len() - line.trim_start_matches(|c: char| c == ' ' || c == '\t').len();
+    let n = line.len() - line.trim_start_matches([' ', '\t']).len();
     &line[..n]
 }
 
@@ -756,7 +756,7 @@ provider: "openai"
         cfg.save_to(&path).unwrap();
         let loaded = HermesConfig::load_from(&path).unwrap();
         assert_eq!(loaded.provider, "openrouter");
-        assert_eq!(loaded.persistent_memory, true);
+        assert!(loaded.persistent_memory);
         assert_eq!(loaded.language, "system");
     }
 
@@ -842,9 +842,11 @@ provider: "openai"
         let path = dir.path().join("config.yaml");
         std::fs::write(&path, yaml).unwrap();
 
-        let mut cfg = HermesConfig::default();
-        cfg.provider = "anthropic".to_string();
-        cfg.model = "claude-opus-4-5".to_string();
+        let cfg = HermesConfig {
+            provider: "anthropic".to_string(),
+            model: "claude-opus-4-5".to_string(),
+            ..HermesConfig::default()
+        };
         cfg.save_to(&path).unwrap();
 
         let content = std::fs::read_to_string(&path).unwrap();

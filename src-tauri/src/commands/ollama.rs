@@ -37,7 +37,7 @@ async fn is_ollama_running() -> bool {
     };
 
     match client
-        .get(&format!("{}/api/tags", OLLAMA_BASE_URL))
+        .get(format!("{}/api/tags", OLLAMA_BASE_URL))
         .send()
         .await
     {
@@ -333,7 +333,7 @@ pub async fn get_ollama_models() -> Result<Vec<OllamaModel>, String> {
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
     let resp = client
-        .get(&format!("{}/api/tags", OLLAMA_BASE_URL))
+        .get(format!("{}/api/tags", OLLAMA_BASE_URL))
         .send()
         .await
         .map_err(|e| format!("Failed to fetch models: {}", e))?;

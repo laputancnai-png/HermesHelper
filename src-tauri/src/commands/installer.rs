@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -54,7 +54,7 @@ fn parse_version(output: &str) -> Option<String> {
     None
 }
 
-fn hermes_binary_path_for_home(home: &PathBuf) -> Option<PathBuf> {
+fn hermes_binary_path_for_home(home: &Path) -> Option<PathBuf> {
     let candidates = [
         home.join(".local/bin/hermes"),
         home.join(".hermes/bin/hermes"),
