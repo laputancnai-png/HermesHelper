@@ -16,6 +16,7 @@ pub fn run() {
         .setup(|app| {
             if let Some(win) = app.get_webview_window("main") {
                 let _ = win.set_icon(tauri::include_image!("icons/128x128.png"));
+                let _ = win.maximize();
             }
 
             let show = MenuItem::with_id(app, "show", "显示 Hermes Manager", true, None::<&str>)?;
