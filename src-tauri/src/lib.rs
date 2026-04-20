@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{chat, config, dashboard, gateway, installer, migrate, process, status, tools, wechat};
+use commands::{chat, config, dashboard, gateway, installer, migrate, ollama, process, status, tools, wechat};
 use commands::dashboard::DashboardWebview;
 use tauri::{
     menu::{Menu, MenuItem},
@@ -82,6 +82,9 @@ pub fn run() {
             config::apply_provider_yaml_patch,
             config::test_api_connection,
             config::get_system_locale,
+            ollama::check_ollama_status,
+            ollama::start_ollama_service,
+            ollama::get_ollama_models,
             process::run_doctor,
             process::get_recent_activity,
             tools::get_tools,

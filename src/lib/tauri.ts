@@ -91,6 +91,12 @@ export interface ChatReply {
   sessionId: string;
 }
 
+export interface OllamaModel {
+  name: string;
+  size?: number;
+  modified_at?: string;
+}
+
 // ── Commands ──────────────────────────────────────────────────
 
 export const Commands = {
@@ -204,6 +210,15 @@ export const Commands = {
 
   resizeDashboard: (x: number, y: number, width: number, height: number): Promise<void> =>
     tauriInvoke("resize_dashboard", { x, y, width, height }),
+
+  checkOllamaStatus: (): Promise<boolean> =>
+    tauriInvoke("check_ollama_status"),
+
+  startOllamaService: (): Promise<string> =>
+    tauriInvoke("start_ollama_service"),
+
+  getOllamaModels: (): Promise<OllamaModel[]> =>
+    tauriInvoke("get_ollama_models"),
 };
 
 // ── Events ────────────────────────────────────────────────────

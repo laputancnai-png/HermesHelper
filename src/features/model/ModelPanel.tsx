@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { theme as P } from "../../theme";
 import { Btn } from "../../components/shared";
-import { Commands } from "../../lib/tauri";
+import { Commands, OllamaModel } from "../../lib/tauri";
 import { useStore } from "../../store";
 import { useLang } from "../../i18n";
 
@@ -26,7 +26,7 @@ const PROVIDERS: ProviderMeta[] = [
 
 const MODEL_SUGGESTIONS: Record<string, string[]> = {
   nvidia: ["qwen/qwen3-next-80b-a3b-instruct", "qwen/qwen3-coder-480b-a35b-instruct"],
-  ollama: ["llama3.3", "qwen2.5-coder:32b", "deepseek-r1:32b"],
+  ollama: [],
 };
 
 // ── Nvidia YAML patch builder ─────────────────────────────────────────────────
@@ -64,6 +64,18 @@ function buildOllamaYamlPatch(model: string): string {
   return lines.join("\n");
 }
 
+function formatSize(bytes: number): string {
+  if (!bytes) return "unknown";
+  const units = ["B", "KB", "MB", "GB"];
+  let size = bytes;
+  let idx = 0;
+  while (size >= 1024 && idx < units.length - 1) {
+    size /= 1024;
+    idx++;
+  }
+  return idx === 0 ? `${size} ${units[idx]}` : `${size.toFixed(1)} ${units[idx]}`;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function ModelPanel() {
@@ -75,6 +87,12 @@ export function ModelPanel() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [saveOk, setSaveOk] = useState(false);
+
+  // Ollama-specific states
+  const [ollamaRunning, setOllamaRunning] = useState(false);
+  const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
+  const [loadingOllama, setLoadingOllama] = useState(false);
+  const [ollamaError, setOllamaError] = useState("");
 
   const loadProviderKey = useCallback(async (provider: string) => {
     const meta = PROVIDERS.find(p => p.value === provider);
@@ -91,6 +109,40 @@ export function ModelPanel() {
       setApiKey("");
     }
   }, []);
+
+  // Check Ollama status and load models when provider changes
+  const checkOllamaAndLoadModels = useCallback(async () => {
+    if (local.provider !== "ollama") {
+      setOllamaRunning(false);
+      setOllamaModels([]);
+      return;
+    }
+
+    setLoadingOllama(true);
+    setOllamaError("");
+
+    try {
+      const isRunning = await Commands.checkOllamaStatus();
+      setOllamaRunning(isRunning);
+
+      if (isRunning) {
+        try {
+          const models = await Commands.getOllamaModels();
+          setOllamaModels(models);
+          // Auto-select first model if none selected
+          if (!local.model && models.length > 0) {
+            setLocal(prev => ({ ...prev, model: models[0].name }));
+          }
+        } catch (e) {
+          setOllamaError(`加载模型失败: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    } catch (e) {
+      setOllamaError(`检查服务状态失败: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setLoadingOllama(false);
+    }
+  }, [local.provider, local.model]);
 
   useEffect(() => {
     Commands.getConfig().then(c => {
@@ -111,17 +163,48 @@ export function ModelPanel() {
     }).catch(() => {});
   }, [setConfig]);
 
+  useEffect(() => {
+    void checkOllamaAndLoadModels();
+  }, [local.provider]);
+
   const selectedMeta = PROVIDERS.find(p => p.value === local.provider);
-  const modelSuggestions = MODEL_SUGGESTIONS[local.provider] ?? [];
+  const modelSuggestions = local.provider === "ollama" ? [] : (MODEL_SUGGESTIONS[local.provider] ?? []);
 
   function handleProviderSelect(value: string) {
     const firstModel = MODEL_SUGGESTIONS[value]?.[0] ?? "";
     setLocal(prev => ({ ...prev, provider: value, model: firstModel }));
     void loadProviderKey(value);
     setMsg("");
+    setOllamaError("");
+  }
+
+  async function handleStartOllama() {
+    setLoadingOllama(true);
+    setOllamaError("");
+
+    try {
+      const result = await Commands.startOllamaService();
+      setMsg(result);
+      setSaveOk(true);
+
+      // Give Ollama a moment to start, then check status
+      setTimeout(() => {
+        void checkOllamaAndLoadModels();
+      }, 1000);
+    } catch (e) {
+      setOllamaError(`启动失败: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setLoadingOllama(false);
+    }
   }
 
   async function handleSave() {
+    if (!local.model) {
+      setMsg("请先选择一个模型");
+      setSaveOk(false);
+      return;
+    }
+
     setSaving(true);
     setMsg("");
     setSaveOk(false);
@@ -232,26 +315,86 @@ export function ModelPanel() {
             </div>
           )}
 
-          {/* Model */}
+          {/* Ollama Service Control */}
+          {local.provider === "ollama" && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: P.soft, marginBottom: 8, letterSpacing: 0.3 }}>
+                服务状态
+              </div>
+
+              {loadingOllama ? (
+                <div style={{ padding: "12px 14px", background: "#F5F5FF", borderRadius: P.radius.md, color: P.soft, fontSize: 13 }}>
+                  ⏳ 检查中...
+                </div>
+              ) : ollamaRunning ? (
+                <div style={{ padding: "12px 14px", background: "#E8FFF5", borderRadius: P.radius.md, color: P.teal, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 14 }}>✓</span> Ollama 已运行
+                </div>
+              ) : (
+                <Btn color={P.coral} onClick={handleStartOllama} loading={loadingOllama}>
+                  🚀 启动 Ollama
+                </Btn>
+              )}
+            </div>
+          )}
+
+          {/* Model selection - Ollama: from live list or input */}
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: P.soft, marginBottom: 8, letterSpacing: 0.3 }}>
               {t.model.model}
             </div>
-            <input
-              list="model-suggestions"
-              value={local.model}
-              onChange={e => setLocal(prev => ({ ...prev, model: e.target.value }))}
-              placeholder={modelSuggestions[0] ?? "model name"}
-              style={{
-                width: "100%", padding: "11px 14px", borderRadius: P.radius.md,
-                border: "2px solid #EBEBF8", fontSize: 13, outline: "none",
-                background: P.white, boxSizing: "border-box", fontFamily: "monospace",
-              }}
-            />
+
+            {local.provider === "ollama" && ollamaRunning ? (
+              ollamaModels.length > 0 ? (
+                <select
+                  value={local.model}
+                  onChange={e => setLocal(prev => ({ ...prev, model: e.target.value }))}
+                  style={{
+                    width: "100%", padding: "11px 14px", borderRadius: P.radius.md,
+                    border: "2px solid #EBEBF8", fontSize: 13, outline: "none",
+                    background: P.white, boxSizing: "border-box", fontFamily: "monospace",
+                  }}
+                >
+                  <option value="">-- 选择一个模型 --</option>
+                  {ollamaModels.map(m => (
+                    <option key={m.name} value={m.name}>
+                      {m.name} {m.size ? `(${formatSize(m.size)})` : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div style={{ padding: "12px 14px", background: "#FFF0EE", borderRadius: P.radius.md, color: P.coral, fontSize: 13, fontWeight: 600 }}>
+                  ⚠️ 没有找到本地模型，请先用 `ollama pull` 下载
+                </div>
+              )
+            ) : (
+              <input
+                list="model-suggestions"
+                value={local.model}
+                onChange={e => setLocal(prev => ({ ...prev, model: e.target.value }))}
+                placeholder={modelSuggestions[0] ?? "model name"}
+                style={{
+                  width: "100%", padding: "11px 14px", borderRadius: P.radius.md,
+                  border: "2px solid #EBEBF8", fontSize: 13, outline: "none",
+                  background: P.white, boxSizing: "border-box", fontFamily: "monospace",
+                }}
+              />
+            )}
             <datalist id="model-suggestions">
               {modelSuggestions.map(m => <option key={m} value={m} />)}
             </datalist>
           </div>
+
+          {/* Ollama error */}
+          {ollamaError && (
+            <div style={{
+              padding: "10px 14px", background: "#FFF0EE", borderRadius: P.radius.md,
+              color: P.coral, fontSize: 12, lineHeight: 1.5,
+              border: "2px solid #FFCCCC", marginBottom: 14, fontWeight: 500,
+            }}>
+              ⚠️ {ollamaError}
+            </div>
+          )}
 
           {/* Tips */}
           {selectedMeta.tips && (
@@ -280,7 +423,7 @@ export function ModelPanel() {
 
       {/* Save */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
-        <Btn color={P.teal} onClick={handleSave} loading={saving}>
+        <Btn color={P.teal} onClick={handleSave} loading={saving} disabled={local.provider === "ollama" && !ollamaRunning}>
           {t.model.save}
         </Btn>
       </div>
