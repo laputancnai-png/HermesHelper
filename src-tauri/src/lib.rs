@@ -14,6 +14,10 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_icon(tauri::include_image!("icons/128x128.png"));
+            }
+
             let show = MenuItem::with_id(app, "show", "显示 Hermes Manager", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;
@@ -73,6 +77,8 @@ pub fn run() {
             config::get_config,
             config::save_config,
             config::save_api_key,
+            config::get_api_key,
+            config::remove_api_key,
             config::apply_provider_yaml_patch,
             config::test_api_connection,
             config::get_system_locale,

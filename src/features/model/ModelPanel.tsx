@@ -1,5 +1,5 @@
 // src/features/model/ModelPanel.tsx
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { theme as P } from "../../theme";
 import { Btn } from "../../components/shared";
 import { Commands } from "../../lib/tauri";
@@ -8,30 +8,25 @@ import { useLang } from "../../i18n";
 
 // ── Provider registry ─────────────────────────────────────────────────────────
 
-type ProviderCategory = "cloud" | "local";
-
 interface ProviderMeta {
   value: string;
   label: string;
   emoji: string;
-  category: ProviderCategory;
   desc: string;
   keyPlaceholder?: string;
   tips?: string;
 }
 
 const PROVIDERS: ProviderMeta[] = [
-  { value: "nvidia",   label: "NVIDIA NIM", emoji: "💚", category: "cloud", desc: "NVIDIA NIM 推理平台", keyPlaceholder: "nvapi-...", tips: "仅写入 ~/.hermes/.env 的 NVIDIA_API_KEY；config.yaml 使用内置 nvidia provider（不写明文 key）" },
-  { value: "ollama",   label: "Ollama",     emoji: "🦙", category: "local", desc: "本地 Ollama 运行时" },
-  { value: "lmstudio", label: "LM Studio",  emoji: "🖥️", category: "local", desc: "LM Studio 本地推理" },
+  { value: "nvidia", label: "NVIDIA NIM", emoji: "💚", desc: "NVIDIA NIM 推理平台", keyPlaceholder: "nvapi-...", tips: "仅写入 ~/.hermes/.env 的 NVIDIA_API_KEY；config.yaml 使用内置 nvidia provider（不写明文 key）" },
+  { value: "ollama", label: "Ollama", emoji: "🦙", desc: "本地 Ollama 运行时" },
 ];
 
 // ── Model suggestions per provider ────────────────────────────────────────────
 
 const MODEL_SUGGESTIONS: Record<string, string[]> = {
-  nvidia:   ["qwen/qwen3-next-80b-a3b-instruct", "qwen/qwen3-coder-480b-a35b-instruct"],
-  ollama:   ["llama3.3", "qwen2.5-coder:32b", "deepseek-r1:32b"],
-  lmstudio: ["local-model"],
+  nvidia: ["qwen/qwen3-next-80b-a3b-instruct", "qwen/qwen3-coder-480b-a35b-instruct"],
+  ollama: ["llama3.3", "qwen2.5-coder:32b", "deepseek-r1:32b"],
 };
 
 // ── Nvidia YAML patch builder ─────────────────────────────────────────────────
@@ -53,14 +48,6 @@ function buildNvidiaYamlPatch(model: string): string {
   return lines.join("\n");
 }
 
-// ── Category tab config ───────────────────────────────────────────────────────
-
-const CATS = [
-  { id: "all",   label: "全部",   color: P.indigo, bg: P.indigo, textActive: "#fff" },
-  { id: "cloud", label: "☁️ 云端", color: "#2AA8D8", bg: "#DCF5FF", textActive: P.ink },
-  { id: "local", label: "🏠 本地", color: "#18B989", bg: "#D8F7EC", textActive: P.ink },
-] as const;
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function ModelPanel() {
@@ -72,8 +59,22 @@ export function ModelPanel() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [saveOk, setSaveOk] = useState(false);
-  const [search, setSearch] = useState("");
-  const [catFilter, setCatFilter] = useState<"all" | "cloud" | "local">("all");
+
+  const loadProviderKey = useCallback(async (provider: string) => {
+    const meta = PROVIDERS.find(p => p.value === provider);
+    if (!meta?.keyPlaceholder) {
+      setApiKey("");
+      setShowKey(false);
+      return;
+    }
+
+    try {
+      const saved = await Commands.getApiKey(provider);
+      setApiKey(saved ?? "");
+    } catch {
+      setApiKey("");
+    }
+  }, []);
 
   useEffect(() => {
     Commands.getConfig().then(c => {
@@ -89,22 +90,17 @@ export function ModelPanel() {
       };
       setConfig(s);
       setLocal(s);
+      void loadProviderKey(s.provider);
     }).catch(() => {});
   }, [setConfig]);
 
   const selectedMeta = PROVIDERS.find(p => p.value === local.provider);
   const modelSuggestions = MODEL_SUGGESTIONS[local.provider] ?? [];
 
-  const filteredProviders = PROVIDERS.filter(p => {
-    const matchCat = catFilter === "all" || p.category === catFilter;
-    const q = search.toLowerCase();
-    const matchSearch = !q || p.label.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q);
-    return matchCat && matchSearch;
-  });
-
   function handleProviderSelect(value: string) {
     const firstModel = MODEL_SUGGESTIONS[value]?.[0] ?? "";
     setLocal(prev => ({ ...prev, provider: value, model: firstModel }));
+    void loadProviderKey(value);
     setMsg("");
   }
 
@@ -115,8 +111,12 @@ export function ModelPanel() {
     try {
       const fullConfig = { ...local, backend: "local" as const };
       await Commands.saveConfig(fullConfig);
-      if (apiKey.trim()) {
-        await Commands.saveApiKey(local.provider, apiKey.trim());
+      if (selectedMeta?.keyPlaceholder) {
+        if (apiKey.trim()) {
+          await Commands.saveApiKey(local.provider, apiKey.trim());
+        } else {
+          await Commands.removeApiKey(local.provider);
+        }
       }
       if (local.provider === "nvidia") {
         await Commands.applyProviderYamlPatch(buildNvidiaYamlPatch(local.model));
@@ -144,48 +144,12 @@ export function ModelPanel() {
         <div style={{ fontSize: 13, color: P.soft, marginTop: 6 }}>{t.model.desc}</div>
       </div>
 
-      {/* Search */}
-      <input
-        type="text"
-        placeholder="搜索提供商..."
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        style={{
-          width: "100%", padding: "11px 14px", borderRadius: P.radius.md,
-          border: "2px solid #EBEBF8", fontSize: 13, outline: "none",
-          background: P.white, marginBottom: 14, boxSizing: "border-box",
-        }}
-      />
-
-      {/* Category tabs */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 14, borderBottom: "2px solid #E8E8F5", paddingBottom: 12, overflowX: "auto" }}>
-        {CATS.map(cat => {
-          const active = catFilter === cat.id;
-          return (
-            <button
-              key={cat.id}
-              onClick={() => setCatFilter(cat.id as typeof catFilter)}
-              style={{
-                padding: "7px 14px", borderRadius: P.radius.md,
-                border: active ? `2px solid ${cat.color}` : "2px solid #E8E8F5",
-                background: active ? (cat.id === "all" ? P.indigo : cat.bg) : P.white,
-                color: active ? (cat.id === "all" ? "#fff" : P.ink) : P.soft,
-                fontWeight: 700, fontSize: 13, cursor: "pointer",
-                transition: "all 0.14s", whiteSpace: "nowrap", flexShrink: 0,
-              }}
-            >
-              {cat.label}
-            </button>
-          );
-        })}
-      </div>
-
       {/* Provider card grid */}
       <div style={{
-        display: "grid", gridTemplateColumns: "repeat(3,1fr)",
+        display: "grid", gridTemplateColumns: "repeat(2,1fr)",
         gap: 10, marginBottom: 18, maxHeight: 300, overflowY: "auto", paddingRight: 4,
       }}>
-        {filteredProviders.map(p => {
+        {PROVIDERS.map(p => {
           const active = local.provider === p.value;
           return (
             <div
@@ -205,23 +169,12 @@ export function ModelPanel() {
                 <span style={{ fontSize: 22, flexShrink: 0 }}>{p.emoji}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: P.ink, wordBreak: "break-word", lineHeight: 1.3 }}>{p.label}</div>
-                  <div style={{
-                    fontSize: 10, color: p.category === "local" ? P.teal : "#2AA8D8",
-                    fontWeight: 600, marginTop: 2,
-                  }}>
-                    {p.category === "local" ? "🏠 本地" : "☁️ 云端"}
-                  </div>
                 </div>
               </div>
               <div style={{ fontSize: 10, color: P.soft, lineHeight: 1.4 }}>{p.desc}</div>
             </div>
           );
         })}
-        {filteredProviders.length === 0 && (
-          <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "32px 16px", color: P.soft, fontSize: 13 }}>
-            未找到匹配的提供商
-          </div>
-        )}
       </div>
 
       {/* Selected provider config */}
@@ -229,34 +182,36 @@ export function ModelPanel() {
         <div style={{ borderTop: "2px solid #F0F0FA", paddingTop: 18 }}>
 
           {/* API Key */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: P.soft, marginBottom: 8, letterSpacing: 0.3 }}>
-              {t.model.apiKey}
-              <span style={{ fontWeight: 400, marginLeft: 6, fontSize: 11 }}>（首次配置时填写）</span>
+          {selectedMeta.keyPlaceholder && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: P.soft, marginBottom: 8, letterSpacing: 0.3 }}>
+                {t.model.apiKey}
+                <span style={{ fontWeight: 400, marginLeft: 6, fontSize: 11 }}>（首次配置时填写）</span>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type={showKey ? "text" : "password"}
+                  value={apiKey}
+                  onChange={e => setApiKey(e.target.value)}
+                  placeholder={selectedMeta.keyPlaceholder}
+                  style={{
+                    flex: 1, padding: "11px 14px", borderRadius: P.radius.md,
+                    border: "2px solid #EBEBF8", fontSize: 13, outline: "none",
+                    fontFamily: "monospace", background: P.white,
+                  }}
+                />
+                <button
+                  onClick={() => setShowKey(v => !v)}
+                  style={{
+                    padding: "0 14px", borderRadius: P.radius.md, border: "2px solid #EBEBF8",
+                    background: P.white, color: P.soft, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                  }}
+                >
+                  {showKey ? t.model.hideKey : t.model.showKey}
+                </button>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input
-                type={showKey ? "text" : "password"}
-                value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
-                placeholder={selectedMeta.keyPlaceholder ?? "sk-..."}
-                style={{
-                  flex: 1, padding: "11px 14px", borderRadius: P.radius.md,
-                  border: "2px solid #EBEBF8", fontSize: 13, outline: "none",
-                  fontFamily: "monospace", background: P.white,
-                }}
-              />
-              <button
-                onClick={() => setShowKey(v => !v)}
-                style={{
-                  padding: "0 14px", borderRadius: P.radius.md, border: "2px solid #EBEBF8",
-                  background: P.white, color: P.soft, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                }}
-              >
-                {showKey ? t.model.hideKey : t.model.showKey}
-              </button>
-            </div>
-          </div>
+          )}
 
           {/* Model */}
           <div style={{ marginBottom: 14 }}>

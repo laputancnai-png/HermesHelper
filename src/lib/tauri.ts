@@ -118,6 +118,12 @@ export const Commands = {
   saveApiKey: (provider: string, key: string): Promise<void> =>
     tauriInvoke("save_api_key", { provider, key }),
 
+  getApiKey: (provider: string): Promise<string | null> =>
+    tauriInvoke("get_api_key", { provider }),
+
+  removeApiKey: (provider: string): Promise<void> =>
+    tauriInvoke("remove_api_key", { provider }),
+
   applyProviderYamlPatch: (patchYaml: string): Promise<void> =>
     tauriInvoke("apply_provider_yaml_patch", { patchYaml }),
 

@@ -295,7 +295,16 @@ pub(crate) fn read_env_value(path: &Path, key: &str) -> Option<String> {
         if let Some(current_key) = env_line_key(line) {
             if current_key.eq_ignore_ascii_case(key) {
                 let (_, value) = line.split_once('=')?;
-                return Some(value.trim().to_string());
+                let raw = value.trim();
+                let unquoted = if raw.len() >= 2
+                    && ((raw.starts_with('"') && raw.ends_with('"'))
+                        || (raw.starts_with('\'') && raw.ends_with('\'')))
+                {
+                    &raw[1..raw.len() - 1]
+                } else {
+                    raw
+                };
+                return Some(unquoted.to_string());
             }
         }
     }
@@ -380,10 +389,6 @@ fn ensure_nvidia_shell_block() -> Result<(), String> {
     let begin = "# >>> hermeshelper nvidia runtime >>>";
     let end = "# <<< hermeshelper nvidia runtime <<<";
 
-    if existing.contains(begin) && existing.contains(end) {
-        return Ok(());
-    }
-
     let block = [
         begin,
         "# Keep Hermes NVIDIA /model validation stable in interactive shells.",
@@ -392,6 +397,10 @@ fn ensure_nvidia_shell_block() -> Result<(), String> {
         "fi",
         "if [[ -f \"$HOME/.hermes/.env\" ]]; then",
         "  _hermes_nvidia_key=\"$(grep '^NVIDIA_API_KEY=' \"$HOME/.hermes/.env\" | head -1 | cut -d= -f2-)\"",
+        "  _hermes_nvidia_key=\"${_hermes_nvidia_key#\"}\"",
+        "  _hermes_nvidia_key=\"${_hermes_nvidia_key%\"}\"",
+        "  _hermes_nvidia_key=\"${_hermes_nvidia_key#\'}\"",
+        "  _hermes_nvidia_key=\"${_hermes_nvidia_key%\'}\"",
         "  if [[ -n \"$_hermes_nvidia_key\" ]]; then",
         "    export NVIDIA_API_KEY=\"$_hermes_nvidia_key\"",
         "  fi",
@@ -400,6 +409,33 @@ fn ensure_nvidia_shell_block() -> Result<(), String> {
         end,
     ]
     .join("\n");
+
+    if let Some((before, rest)) = existing.split_once(begin) {
+        if let Some((_, after)) = rest.split_once(end) {
+            let before = before.trim_end();
+            let after = after.trim_start();
+            let mut next = String::new();
+
+            if !before.is_empty() {
+                next.push_str(before);
+                next.push_str("\n\n");
+            }
+
+            next.push_str(&block);
+
+            if !after.is_empty() {
+                next.push_str("\n\n");
+                next.push_str(after);
+            }
+
+            if !next.ends_with('\n') {
+                next.push('\n');
+            }
+
+            return std::fs::write(&zshrc, next)
+                .map_err(|e| format!("Failed to update ~/.zshrc: {e}"));
+        }
+    }
 
     let mut next = existing;
     if !next.is_empty() && !next.ends_with('\n') {
@@ -455,6 +491,40 @@ pub async fn save_api_key(provider: String, key: String) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_api_key(provider: String) -> Result<Option<String>, String> {
+    let path = env_path();
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let key = env_key_for_provider(&provider);
+    Ok(read_env_value(&path, key))
+}
+
+#[tauri::command]
+pub async fn remove_api_key(provider: String) -> Result<(), String> {
+    let path = env_path();
+    if !path.exists() {
+        return Ok(());
+    }
+
+    let target_key = env_key_for_provider(&provider);
+    let existing = std::fs::read_to_string(&path).unwrap_or_default();
+    let filtered: Vec<String> = existing
+        .lines()
+        .filter(|line| match env_line_key(line) {
+            Some(current) => !current.eq_ignore_ascii_case(target_key),
+            None => true,
+        })
+        .map(String::from)
+        .collect();
+
+    std::fs::write(&path, filtered.join("\n") + "\n")
+        .map_err(|e| format!("Failed to write .env: {e}"))?;
+    tighten_env_permissions(&path)
 }
 
 /// Patch a single key:value inside the last top-level `model:` block using
