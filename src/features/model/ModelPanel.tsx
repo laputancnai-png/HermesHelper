@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { theme as P } from "../../theme";
 import { Btn } from "../../components/shared";
-import { Commands, OllamaModel } from "../../lib/tauri";
+import { Commands, OllamaInstallStatus, OllamaModel } from "../../lib/tauri";
 import { useStore } from "../../store";
 import { useLang } from "../../i18n";
 
@@ -89,6 +89,8 @@ export function ModelPanel() {
   const [saveOk, setSaveOk] = useState(false);
 
   // Ollama-specific states
+  const [ollamaInstalled, setOllamaInstalled] = useState<boolean | null>(null);
+  const [ollamaInstallStatus, setOllamaInstallStatus] = useState<OllamaInstallStatus | null>(null);
   const [ollamaRunning, setOllamaRunning] = useState(false);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [loadingOllama, setLoadingOllama] = useState(false);
@@ -113,6 +115,8 @@ export function ModelPanel() {
   // Check Ollama status and load models when provider changes
   const checkOllamaAndLoadModels = useCallback(async () => {
     if (local.provider !== "ollama") {
+      setOllamaInstalled(null);
+      setOllamaInstallStatus(null);
       setOllamaRunning(false);
       setOllamaModels([]);
       return;
@@ -122,6 +126,16 @@ export function ModelPanel() {
     setOllamaError("");
 
     try {
+      const installStatus = await Commands.getOllamaInstallStatus();
+      setOllamaInstallStatus(installStatus);
+      const installed = installStatus.canAttemptStart;
+      setOllamaInstalled(installed);
+      if (!installed) {
+        setOllamaRunning(false);
+        setOllamaModels([]);
+        return;
+      }
+
       const isRunning = await Commands.checkOllamaStatus();
       setOllamaRunning(isRunning);
 
@@ -327,6 +341,33 @@ export function ModelPanel() {
                 <div style={{ padding: "12px 14px", background: "#F5F5FF", borderRadius: P.radius.md, color: P.soft, fontSize: 13 }}>
                   ⏳ 检查中...
                 </div>
+              ) : ollamaInstalled === false ? (
+                <div style={{
+                  padding: "12px 14px", background: "#FFF0EE", borderRadius: P.radius.md,
+                  color: P.coral, fontSize: 12, lineHeight: 1.6,
+                  border: "2px solid #FFCCCC", fontWeight: 600,
+                }}>
+                  <div style={{ marginBottom: 6 }}>⚠️ 本机未检测到 Ollama</div>
+                  <div style={{ fontWeight: 500 }}>
+                    请先安装 Ollama，然后下载需要的大模型再回来配置。
+                  </div>
+                  <div style={{ marginTop: 6, fontFamily: "monospace", whiteSpace: "pre-wrap", fontWeight: 500 }}>
+                    macOS: brew install ollama{"\n"}
+                    Linux: curl -fsSL https://ollama.com/install.sh | sh{"\n"}
+                    下载模型: ollama pull &lt;model_name&gt;
+                  </div>
+                </div>
+              ) : ollamaInstallStatus && !ollamaInstallStatus.cliAvailable ? (
+                <div style={{
+                  padding: "12px 14px", background: "#FFF8E8", borderRadius: P.radius.md,
+                  color: "#B87803", fontSize: 12, lineHeight: 1.6,
+                  border: "2px solid #FFE066", fontWeight: 600,
+                }}>
+                  <div style={{ marginBottom: 6 }}>ℹ️ 检测到 Ollama App，可尝试直接启动</div>
+                  <div style={{ fontWeight: 500 }}>
+                    若你希望在终端使用 `ollama pull` 下载/管理模型，请再安装 CLI。
+                  </div>
+                </div>
               ) : ollamaRunning ? (
                 <div style={{ padding: "12px 14px", background: "#E8FFF5", borderRadius: P.radius.md, color: P.teal, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 14 }}>✓</span> Ollama 已运行
@@ -345,7 +386,11 @@ export function ModelPanel() {
               {t.model.model}
             </div>
 
-            {local.provider === "ollama" && ollamaRunning ? (
+            {local.provider === "ollama" && ollamaInstalled === false ? (
+              <div style={{ padding: "12px 14px", background: "#FFF7E8", borderRadius: P.radius.md, color: "#B87803", fontSize: 13, fontWeight: 600 }}>
+                请先安装 Ollama 并执行 `ollama pull` 下载模型
+              </div>
+            ) : local.provider === "ollama" && ollamaRunning ? (
               ollamaModels.length > 0 ? (
                 <select
                   value={local.model}
@@ -424,7 +469,7 @@ export function ModelPanel() {
 
       {/* Save */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
-        <Btn color={P.teal} onClick={handleSave} loading={saving} disabled={local.provider === "ollama" && !ollamaRunning}>
+        <Btn color={P.teal} onClick={handleSave} loading={saving} disabled={local.provider === "ollama" && (ollamaInstalled !== true || !ollamaRunning)}>
           {t.model.save}
         </Btn>
       </div>

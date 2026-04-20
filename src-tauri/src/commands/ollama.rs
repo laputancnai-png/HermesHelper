@@ -1,5 +1,6 @@
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::io::ErrorKind;
 use std::process::Stdio;
 use tokio::process::Command;
 use tokio::time::{sleep, Duration};
@@ -88,6 +89,14 @@ pub struct OllamaModel {
     pub modified_at: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct OllamaInstallStatus {
+    pub cli_available: bool,
+    pub app_available: bool,
+    pub can_attempt_start: bool,
+}
+
 #[derive(Debug, Deserialize)]
 struct ModelsResponse {
     models: Vec<ModelInfo>,
@@ -106,6 +115,41 @@ struct ModelInfo {
 #[tauri::command]
 pub async fn check_ollama_status() -> Result<bool, String> {
     Ok(is_ollama_running().await)
+}
+
+/// Check if Ollama binary is installed and callable from PATH
+#[tauri::command]
+pub async fn check_ollama_installed() -> Result<bool, String> {
+    match Command::new("ollama").arg("--version").output().await {
+        Ok(out) => Ok(out.status.success()),
+        Err(e) if e.kind() == ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(format!("检查 Ollama CLI 失败: {}", e)),
+    }
+}
+
+/// Return richer installation/capability status so UI can distinguish CLI and app installs.
+#[tauri::command]
+pub async fn get_ollama_install_status() -> Result<OllamaInstallStatus, String> {
+    let cli_available = match Command::new("ollama").arg("--version").output().await {
+        Ok(out) => out.status.success(),
+        Err(e) if e.kind() == ErrorKind::NotFound => false,
+        Err(e) => return Err(format!("检查 Ollama CLI 失败: {}", e)),
+    };
+
+    #[cfg(target_os = "macos")]
+    let app_available = match Command::new("open").args(["-Ra", "Ollama"]).output().await {
+        Ok(out) => out.status.success(),
+        Err(_) => false,
+    };
+
+    #[cfg(not(target_os = "macos"))]
+    let app_available = false;
+
+    Ok(OllamaInstallStatus {
+        cli_available,
+        app_available,
+        can_attempt_start: cli_available || app_available,
+    })
 }
 
 /// Launch Ollama service in the background (macOS: homebrew installed)

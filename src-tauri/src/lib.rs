@@ -82,6 +82,8 @@ pub fn run() {
             config::apply_provider_yaml_patch,
             config::test_api_connection,
             config::get_system_locale,
+            ollama::check_ollama_installed,
+            ollama::get_ollama_install_status,
             ollama::check_ollama_status,
             ollama::start_ollama_service,
             ollama::get_ollama_models,

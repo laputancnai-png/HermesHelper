@@ -97,6 +97,12 @@ export interface OllamaModel {
   modified_at?: string;
 }
 
+export interface OllamaInstallStatus {
+  cliAvailable: boolean;
+  appAvailable: boolean;
+  canAttemptStart: boolean;
+}
+
 // ── Commands ──────────────────────────────────────────────────
 
 export const Commands = {
@@ -210,6 +216,12 @@ export const Commands = {
 
   resizeDashboard: (x: number, y: number, width: number, height: number): Promise<void> =>
     tauriInvoke("resize_dashboard", { x, y, width, height }),
+
+  checkOllamaInstalled: (): Promise<boolean> =>
+    tauriInvoke("check_ollama_installed"),
+
+  getOllamaInstallStatus: (): Promise<OllamaInstallStatus> =>
+    tauriInvoke("get_ollama_install_status"),
 
   checkOllamaStatus: (): Promise<boolean> =>
     tauriInvoke("check_ollama_status"),
