@@ -192,7 +192,8 @@ export function ModelPanel() {
         void checkOllamaAndLoadModels();
       }, 1000);
     } catch (e) {
-      setOllamaError(`启动失败: ${e instanceof Error ? e.message : String(e)}`);
+      const raw = e instanceof Error ? e.message : String(e);
+      setOllamaError(raw.startsWith("启动失败") || raw.startsWith("无法启动") ? raw : `启动失败: ${raw}`);
     } finally {
       setLoadingOllama(false);
     }
