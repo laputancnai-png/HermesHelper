@@ -45,21 +45,39 @@ pub async fn hermes_chat(
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
-    // session_id may appear in stderr or stdout depending on Hermes version
-    let sid = extract_session_id(&stderr)
-        .or_else(|| extract_session_id(&stdout))
-        .ok_or_else(|| format!("无法解析 session_id，原始输出: {}", stdout.trim()))?;
-
-    // reply is always stdout (trimmed); if stdout is empty and exit failed, return error
-    let reply = stdout.trim().to_string();
-    if reply.is_empty() && !output.status.success() {
-        let msg = if stderr.trim().is_empty() {
-            "Hermes 返回错误".to_string()
-        } else {
+    // If Hermes exited with error, surface the original error first.
+    if !output.status.success() {
+        let msg = if !stderr.trim().is_empty() {
             stderr.trim().to_string()
+        } else if !stdout.trim().is_empty() {
+            stdout.trim().to_string()
+        } else {
+            "Hermes 返回错误".to_string()
         };
         return Err(msg);
     }
+
+    // session_id may appear in stderr or stdout depending on Hermes version
+    let sid = extract_session_id(&stderr)
+        .or_else(|| extract_session_id(&stdout))
+        .ok_or_else(|| {
+            let raw = if !stderr.trim().is_empty() {
+                stderr.trim()
+            } else {
+                stdout.trim()
+            };
+            format!("无法解析 session_id，原始输出: {raw}")
+        })?;
+
+    // Reply comes from stdout, but older Hermes may include a leading
+    // "session_id: ..." line there. Strip that metadata line.
+    let reply = stdout
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("session_id:"))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string();
 
     Ok(ChatReply { reply, session_id: sid })
 }

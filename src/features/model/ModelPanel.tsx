@@ -32,6 +32,7 @@ const MODEL_SUGGESTIONS: Record<string, string[]> = {
 // ── Nvidia YAML patch builder ─────────────────────────────────────────────────
 
 const NVIDIA_API = "https://integrate.api.nvidia.com/v1";
+const OLLAMA_API = "http://127.0.0.1:11434/v1";
 
 function buildNvidiaYamlPatch(model: string): string {
   const esc = (s: string) => s.replace(/"/g, '\\"');
@@ -42,6 +43,21 @@ function buildNvidiaYamlPatch(model: string): string {
     "  provider: nvidia",
     `  default: "${esc(model)}"`,
     `  base_url: "${NVIDIA_API}"`,
+    "  api_mode: chat_completions",
+  ];
+
+  return lines.join("\n");
+}
+
+function buildOllamaYamlPatch(model: string): string {
+  const esc = (s: string) => s.replace(/"/g, '\\"');
+
+  // Use local OpenAI-compatible endpoint; avoid stale remote base_url from other providers.
+  const lines = [
+    "model:",
+    "  provider: custom",
+    `  default: "${esc(model)}"`,
+    `  base_url: "${OLLAMA_API}"`,
     "  api_mode: chat_completions",
   ];
 
@@ -78,8 +94,9 @@ export function ModelPanel() {
 
   useEffect(() => {
     Commands.getConfig().then(c => {
+      const uiProvider = c.provider === "custom" ? "ollama" : c.provider;
       const s = {
-        provider: c.provider,
+        provider: uiProvider,
         model: c.model,
         memoryLimitMb: c.memoryLimitMb,
         persistentMemory: c.persistentMemory,
@@ -120,6 +137,8 @@ export function ModelPanel() {
       }
       if (local.provider === "nvidia") {
         await Commands.applyProviderYamlPatch(buildNvidiaYamlPatch(local.model));
+      } else if (local.provider === "ollama") {
+        await Commands.applyProviderYamlPatch(buildOllamaYamlPatch(local.model));
       }
       setConfig(local);
       setSaveOk(true);
