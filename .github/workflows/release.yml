@@ -82,9 +82,12 @@ jobs:
         run: |
           SRC_APPIMAGE=$(ls src-tauri/target/release/bundle/appimage/hermes-manager_*.AppImage | head -1)
           SRC_DEB=$(ls src-tauri/target/release/bundle/deb/hermes-manager_*.deb | head -1)
+          SRC_RPM=$(ls src-tauri/target/release/bundle/rpm/hermes-manager-*.rpm | head -1)
           cp "$SRC_APPIMAGE" "hermes-manager-latest-linux-x64.AppImage"
           cp "$SRC_DEB" "hermes-manager-latest-linux-x64.deb"
+          cp "$SRC_RPM" "hermes-manager-latest-linux-x64.rpm"
           gh release upload "$GITHUB_REF_NAME" \
             "hermes-manager-latest-linux-x64.AppImage" \
             "hermes-manager-latest-linux-x64.deb" \
+            "hermes-manager-latest-linux-x64.rpm" \
             --clobber
