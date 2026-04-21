@@ -56,3 +56,38 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Upload stable-name asset (macOS Apple Silicon)
+        if: matrix.args == '--target aarch64-apple-darwin'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cp "src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/hermes-manager_${VERSION}_aarch64.dmg" \
+             "hermes-manager-latest-macos-arm64.dmg"
+          gh release upload "$GITHUB_REF_NAME" "hermes-manager-latest-macos-arm64.dmg" --clobber
+
+      - name: Upload stable-name asset (macOS Intel)
+        if: matrix.args == '--target x86_64-apple-darwin'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cp "src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/hermes-manager_${VERSION}_x64.dmg" \
+             "hermes-manager-latest-macos-x64.dmg"
+          gh release upload "$GITHUB_REF_NAME" "hermes-manager-latest-macos-x64.dmg" --clobber
+
+      - name: Upload stable-name assets (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cp "src-tauri/target/release/bundle/appimage/hermes-manager_${VERSION}_amd64.AppImage" \
+             "hermes-manager-latest-linux-x64.AppImage"
+          cp "src-tauri/target/release/bundle/deb/hermes-manager_${VERSION}_amd64.deb" \
+             "hermes-manager-latest-linux-x64.deb"
+          gh release upload "$GITHUB_REF_NAME" \
+            "hermes-manager-latest-linux-x64.AppImage" \
+            "hermes-manager-latest-linux-x64.deb" \
+            --clobber
