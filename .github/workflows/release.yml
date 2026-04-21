@@ -62,9 +62,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          cp "src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/hermes-manager_${VERSION}_aarch64.dmg" \
-             "hermes-manager-latest-macos-arm64.dmg"
+          SRC=$(ls src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/hermes-manager_*.dmg | head -1)
+          cp "$SRC" "hermes-manager-latest-macos-arm64.dmg"
           gh release upload "$GITHUB_REF_NAME" "hermes-manager-latest-macos-arm64.dmg" --clobber
 
       - name: Upload stable-name asset (macOS Intel)
@@ -72,9 +71,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          cp "src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/hermes-manager_${VERSION}_x64.dmg" \
-             "hermes-manager-latest-macos-x64.dmg"
+          SRC=$(ls src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/hermes-manager_*.dmg | head -1)
+          cp "$SRC" "hermes-manager-latest-macos-x64.dmg"
           gh release upload "$GITHUB_REF_NAME" "hermes-manager-latest-macos-x64.dmg" --clobber
 
       - name: Upload stable-name assets (Linux)
@@ -82,11 +80,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          cp "src-tauri/target/release/bundle/appimage/hermes-manager_${VERSION}_amd64.AppImage" \
-             "hermes-manager-latest-linux-x64.AppImage"
-          cp "src-tauri/target/release/bundle/deb/hermes-manager_${VERSION}_amd64.deb" \
-             "hermes-manager-latest-linux-x64.deb"
+          SRC_APPIMAGE=$(ls src-tauri/target/release/bundle/appimage/hermes-manager_*.AppImage | head -1)
+          SRC_DEB=$(ls src-tauri/target/release/bundle/deb/hermes-manager_*.deb | head -1)
+          cp "$SRC_APPIMAGE" "hermes-manager-latest-linux-x64.AppImage"
+          cp "$SRC_DEB" "hermes-manager-latest-linux-x64.deb"
           gh release upload "$GITHUB_REF_NAME" \
             "hermes-manager-latest-linux-x64.AppImage" \
             "hermes-manager-latest-linux-x64.deb" \
