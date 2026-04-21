@@ -64,14 +64,14 @@ install_macos() {
 
   hdiutil detach "$VOLUME" -quiet
 
+  echo "Removing macOS quarantine attributes..."
+  xattr -cr "$APP_DST"
+
   echo ""
   echo "Hermes Helper installed to /Applications/hermes-manager.app"
   echo ""
   echo "  Open via Spotlight (Cmd+Space → hermes-manager)"
   echo "  or: open /Applications/hermes-manager.app"
-  echo ""
-  echo "  If macOS blocks the app on first launch, go to:"
-  echo "  System Settings → Privacy & Security → Open Anyway"
 }
 
 case "$OS" in
