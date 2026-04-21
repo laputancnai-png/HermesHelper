@@ -15,7 +15,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             if let Some(win) = app.get_webview_window("main") {
-                let _ = win.set_icon(tauri::include_image!("icons/128x128.png"));
+                if let Err(err) = win.set_icon(tauri::include_image!("icons/32x32.png")) {
+                    eprintln!("[hermes-manager] set window icon failed: {err}");
+                }
                 let _ = win.maximize();
             }
 
