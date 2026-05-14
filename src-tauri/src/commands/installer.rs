@@ -63,7 +63,7 @@ fn hermes_binary_path_for_home(home: &Path) -> Option<PathBuf> {
 }
 
 /// Try to find the hermes binary without relying on the GUI app's PATH.
-fn hermes_binary_path() -> Option<PathBuf> {
+pub fn hermes_binary_path() -> Option<PathBuf> {
     hermes_binary_path_for_home(&dirs::home_dir()?)
 }
 

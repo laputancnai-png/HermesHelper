@@ -53,14 +53,18 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Start Hermes dashboard in background (no browser open)
-            if let Err(e) = std::process::Command::new("hermes")
+            // Start Hermes dashboard in background (no browser open).
+            // Use the resolved binary path so this works in GUI context where
+            // ~/.local/bin is not in PATH.
+            let hermes_bin = commands::installer::hermes_binary_path()
+                .unwrap_or_else(|| std::path::PathBuf::from("hermes"));
+            if let Err(e) = std::process::Command::new(&hermes_bin)
                 .args(["dashboard", "--no-open"])
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
                 .spawn()
             {
-                eprintln!("[hermes-manager] dashboard spawn failed: {e}");
+                eprintln!("[hermes-manager] dashboard spawn failed ({}): {e}", hermes_bin.display());
             }
 
             Ok(())
