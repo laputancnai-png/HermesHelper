@@ -91,3 +91,14 @@ jobs:
             "hermes-manager-latest-linux-x64.deb" \
             "hermes-manager-latest-linux-x64.rpm" \
             --clobber
+
+  publish:
+    needs: release
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ github.ref_name }}" --draft=false --latest --repo "${{ github.repository }}"
