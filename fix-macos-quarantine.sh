@@ -28,19 +28,33 @@ xattr -d com.apple.quarantine "$DMG" 2>/dev/null && echo "Quarantine removed fro
 
 # ── mount ─────────────────────────────────────────────────────────────────────
 echo "Mounting..."
-MOUNT_OUTPUT=$(hdiutil attach "$DMG" -nobrowse -noautoopen 2>&1) || {
+_HDIUTIL_ERR=$(mktemp)
+PLIST=$(hdiutil attach "$DMG" -nobrowse -noautoopen -plist 2>"$_HDIUTIL_ERR") || {
   echo "ERROR: hdiutil attach failed:" >&2
-  echo "$MOUNT_OUTPUT" >&2
+  cat "$_HDIUTIL_ERR" >&2
+  rm -f "$_HDIUTIL_ERR"
   exit 1
 }
+rm -f "$_HDIUTIL_ERR"
 
-# Volume name may contain spaces; grep for /Volumes/ and take the full remainder
-VOLUME=$(echo "$MOUNT_OUTPUT" | grep -oE '/Volumes/[^\t]+' | tail -1 | sed 's/[[:space:]]*$//')
+VOLUME=$(printf '%s' "$PLIST" | python3 -c "
+import sys, plistlib
+try:
+    d = plistlib.loads(sys.stdin.buffer.read())
+    for e in d.get('system-entities', []):
+        mp = e.get('mount-point')
+        if mp:
+            print(mp, end='')
+            break
+except Exception as ex:
+    sys.stderr.write(str(ex) + '\n')
+    sys.exit(1)
+") || true
 
 if [ -z "$VOLUME" ] || [ ! -d "$VOLUME" ]; then
   echo "ERROR: Could not determine mount point." >&2
-  echo "hdiutil output was:" >&2
-  echo "$MOUNT_OUTPUT" >&2
+  echo "hdiutil plist output:" >&2
+  echo "$PLIST" >&2
   exit 1
 fi
 
