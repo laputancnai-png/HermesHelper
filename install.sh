@@ -67,6 +67,11 @@ install_macos() {
   echo "Removing macOS quarantine attributes..."
   xattr -cr "$APP_DST"
 
+  if [ "$ARCH" = "arm64" ]; then
+    echo "Applying ad-hoc signature (required on Apple Silicon)..."
+    codesign --force --deep --sign - "$APP_DST" 2>/dev/null || true
+  fi
+
   echo ""
   echo "Hermes Helper installed to /Applications/hermes-manager.app"
   echo ""

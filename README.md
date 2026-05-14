@@ -42,22 +42,37 @@ npm run tauri dev
 
 ## macOS 安装说明
 
-从 GitHub Releases 直接下载 DMG 的用户，macOS Gatekeeper 会因 App 未经 Apple 公证而弹出
-**"is damaged and can't be opened"** 错误（Apple Silicon 尤为严格）。
+### 推荐：一键安装脚本
 
-运行仓库内的修复脚本即可一键解决：
+```bash
+curl -fsSL https://raw.githubusercontent.com/laputancnai-png/HermesHelper/main/install.sh | sh
+```
+
+脚本会自动下载、安装，并处理好所有 Gatekeeper 问题，无需额外操作。
+
+### 直接下载 DMG
+
+从 GitHub Releases 下载 DMG 的用户，macOS Gatekeeper 会因 App 未经 Apple 公证而拦截，
+不同芯片的表现不同：
+
+| 芯片 | 现象 | 解决方法 |
+|------|------|----------|
+| **Apple Silicon (M 系列)** | 弹出 "is damaged and can't be opened"，无法绕过 | 运行 `fix-macos-quarantine.sh`（见下） |
+| **Intel** | 弹出 "无法验证开发者" 警告 | 系统设置 → 隐私与安全性 → 仍要打开 |
+
+#### Apple Silicon 修复脚本
+
+下载 DMG 后，在终端运行：
 
 ```bash
 # 自动查找 ~/Downloads 里最新的 DMG 并安装
-./fix-macos-quarantine.sh
+curl -fsSL https://raw.githubusercontent.com/laputancnai-png/HermesHelper/main/fix-macos-quarantine.sh | bash
 
-# 或手动指定路径
-./fix-macos-quarantine.sh ~/Downloads/hermes-manager-latest-macos-arm64.dmg
+# 或先下载脚本再指定路径
+bash fix-macos-quarantine.sh ~/Downloads/hermes-manager-latest-macos-arm64.dmg
 ```
 
-脚本会自动完成：清除隔离属性 → 挂载 DMG → 拷贝到 /Applications → 递归清除 .app 内属性 → 打开。
-
-> 推荐使用 `install.sh` 一键安装，该脚本已内置此处理流程。
+脚本完成后直接双击打开，后续更新版本需重新运行一次。
 
 ## 常见问题
 
