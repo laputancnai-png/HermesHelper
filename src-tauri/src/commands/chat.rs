@@ -36,8 +36,19 @@ pub async fn hermes_chat(
         }
     }
 
+    // macOS GUI apps don't inherit the shell PATH; augment with common install locations.
+    let path_env = {
+        let current = std::env::var("PATH").unwrap_or_default();
+        let home = std::env::var("HOME").unwrap_or_default();
+        let extras = format!(
+            "/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:{home}/.local/bin:/usr/local/sbin"
+        );
+        format!("{extras}:{current}")
+    };
+
     let output = Command::new("hermes")
         .args(&args)
+        .env("PATH", &path_env)
         .output()
         .await
         .map_err(|e| format!("Hermes 未安装或无法启动: {e}"))?;
