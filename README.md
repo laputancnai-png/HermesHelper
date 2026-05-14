@@ -40,6 +40,25 @@ npm run bootstrap:macos
 npm run tauri dev
 ```
 
+## macOS 安装说明
+
+从 GitHub Releases 直接下载 DMG 的用户，macOS Gatekeeper 会因 App 未经 Apple 公证而弹出
+**"is damaged and can't be opened"** 错误（Apple Silicon 尤为严格）。
+
+运行仓库内的修复脚本即可一键解决：
+
+```bash
+# 自动查找 ~/Downloads 里最新的 DMG 并安装
+./fix-macos-quarantine.sh
+
+# 或手动指定路径
+./fix-macos-quarantine.sh ~/Downloads/hermes-manager-latest-macos-arm64.dmg
+```
+
+脚本会自动完成：清除隔离属性 → 挂载 DMG → 拷贝到 /Applications → 递归清除 .app 内属性 → 打开。
+
+> 推荐使用 `install.sh` 一键安装，该脚本已内置此处理流程。
+
 ## 常见问题
 
 ### 1) `tauri: not found`
